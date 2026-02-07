@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
+}
+
+model Gift {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Market info
+  marketTicker String
+  marketTitle  String
+  side         String   // "yes" or "no"
+  outcomeMint  String
+  tokenAmount  Float
+  costUSDC     Float
+
+  // Sender
+  senderPrivyId String
+  senderEmail   String?
+
+  // Recipient
+  recipientName    String
+  recipientContact String   // email or phone
+  giftMessage      String?
+
+  // Recipient (filled on claim)
+  recipientWalletAddress String?
+  recipientPrivyId       String?
+
+  // Status
+  status        String   @default("pending_payment")
+  purchaseTxSig String?
+  claimTxSig    String?
+  claimedAt     DateTime?
+
+  @@index([recipientContact])
+  @@index([senderPrivyId])
+  @@index([status])
+}

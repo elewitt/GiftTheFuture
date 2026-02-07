@@ -1,0 +1,8 @@
+node_modules/
+.next/
+.env.local
+.env*.local
+*.pem
+server-wallet.json
+.env
+.env.local
