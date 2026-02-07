@@ -58,7 +58,7 @@ export async function POST(req: Request) {
     const outputMint = side === "yes" ? yesMint : noMint;
 
     // 2. Create gift record (pending_payment)
-    const gift = createGift({
+    const gift = await createGift({
       marketTicker,
       marketTitle: marketTitle || marketTicker,
       side,
@@ -88,7 +88,7 @@ export async function POST(req: Request) {
       orderResponse.transaction
     );
 
-    updateGift(gift.id, { purchaseTxSig: signature });
+    await updateGift(gift.id, { purchaseTxSig: signature });
 
     // 5. Wait for fill
     let filled = false;
@@ -116,7 +116,7 @@ export async function POST(req: Request) {
     }
 
     if (!filled) {
-      updateGift(gift.id, { status: "expired" });
+      await updateGift(gift.id, { status: "expired" });
       return NextResponse.json(
         { error: "Order not confirmed in time" },
         { status: 504 }
@@ -125,7 +125,7 @@ export async function POST(req: Request) {
 
     // 6. Update gift to pending_claim
     const tokensReceived = parseInt(orderResponse.quote.outputAmount || "0");
-    updateGift(gift.id, {
+    await updateGift(gift.id, {
       status: "pending_claim",
       tokenAmount: tokensReceived,
     });
