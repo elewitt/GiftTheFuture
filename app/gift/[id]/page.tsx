@@ -84,7 +84,7 @@ export default function GiftClaimPage() {
         account.type === "wallet" && "address" in account
     );
 
-    const walletAddress = embedded?.address || linkedWallet?.address;
+    const walletAddress = embedded?.address || (linkedWallet as any)?.address;
     
     if (walletAddress) {
       console.log("[Claim] Found wallet, claiming:", walletAddress);
