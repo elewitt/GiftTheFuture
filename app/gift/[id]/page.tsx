@@ -80,7 +80,7 @@ export default function GiftClaimPage() {
     
     // Also check user.linkedAccounts for wallet address
     const linkedWallet = user?.linkedAccounts?.find(
-      (account): account is { type: string; address: string } => 
+      (account: any) => 
         account.type === "wallet" && "address" in account
     );
 
