@@ -26,7 +26,6 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const retryCount = useRef(0);
-	
   
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,20 +35,12 @@ export default function HomePage() {
   // Category filter
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  // Load trending markets on mount
+  // Load trending markets on mount with retry
   useEffect(() => {
     fetchTrendingMarkets();
   }, []);
 
   async function fetchTrendingMarkets() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/markets?trending=true&limit=30");
-      if (!res.ok) throw new Error("Failed to fetch markets");
-      const data = await res.json();
-      setMarkets(data.markets);
-    } catch (err: any) {async function fetchTrendingMarkets() {
     setLoading(true);
     setError(null);
     try {
@@ -62,6 +53,7 @@ export default function HomePage() {
         setMarkets(data.markets);
         retryCount.current = 0;
       } else if (retryCount.current < 2) {
+        // Retry if no markets returned
         retryCount.current++;
         setTimeout(fetchTrendingMarkets, 1000);
         return;
@@ -72,11 +64,6 @@ export default function HomePage() {
         setTimeout(fetchTrendingMarkets, 1000);
         return;
       }
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
       setError(err.message);
     } finally {
       setLoading(false);
@@ -175,7 +162,6 @@ export default function HomePage() {
           <span className="text-slate-500 text-sm">Powered by</span>
           <span className="text-[#00D084] text-xl font-bold tracking-tight">Kalshi</span>
         </div>
-        
 
         <p className="text-slate-500 max-w-md mx-auto text-base mb-8">
           Buy a prediction market position and send it as a gift.
