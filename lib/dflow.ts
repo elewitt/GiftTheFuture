@@ -12,11 +12,11 @@
 // Dev endpoints — switch to production URLs when you coordinate with DFlow team
 // Dev docs: https://pond.dflow.net/build/endpoints
 const METADATA_API =
-  process.env.DFLOW_METADATA_API || "https://dev-prediction-markets-api.dflow.net";
+  process.env.DFLOW_METADATA_API || "https://d.prediction-markets-api.dflow.net";
 const TRADE_API =
-  process.env.DFLOW_TRADE_API || "https://dev-quote-api.dflow.net";
+  process.env.DFLOW_TRADE_API || "https://d.quote-api.dflow.net";
 const WS_URL =
-  process.env.DFLOW_WS_URL || "wss://dev-prediction-markets-api.dflow.net/api/v1/ws";
+  process.env.DFLOW_WS_URL || "wss://d.prediction-markets-api.dflow.net/api/v1/ws";
 
 function apiKey(): string {
   return process.env.DFLOW_API_KEY || "";
