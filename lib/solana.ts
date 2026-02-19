@@ -20,10 +20,12 @@ import {
   getAssociatedTokenAddressSync,
   createAssociatedTokenAccountInstruction,
   createTransferInstruction,
+  getAccount,
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import { getMarketByMint } from "./dflow";
+import bs58 from "bs58";
 
 // ─── Connection ──────────────────────────────────────────────
 
@@ -48,8 +50,25 @@ export function getServerKeypair(): Keypair {
     if (!key) {
       throw new Error("SERVER_WALLET_PRIVATE_KEY not set in environment");
     }
-    const decoded = Buffer.from(key, "base64");
-    _serverKeypair = Keypair.fromSecretKey(new Uint8Array(decoded));
+
+    // Try to decode as base58 first (common Solana wallet export format)
+    // Fall back to base64 if that fails
+    let secretKey: Uint8Array;
+    try {
+      // Check if it looks like a JSON array (e.g., "[1,2,3,...]")
+      if (key.startsWith("[")) {
+        const parsed = JSON.parse(key);
+        secretKey = new Uint8Array(parsed);
+      } else {
+        // Try base58 first (starts with numbers or letters, 64-88 chars)
+        secretKey = bs58.decode(key);
+      }
+    } catch {
+      // Fall back to base64
+      secretKey = new Uint8Array(Buffer.from(key, "base64"));
+    }
+
+    _serverKeypair = Keypair.fromSecretKey(secretKey);
   }
   return _serverKeypair;
 }
@@ -192,6 +211,45 @@ export async function transferOutcomeTokens(params: {
   await confirmTransaction(signature);
 
   return signature;
+}
+
+// ─── Token Balance Queries ───────────────────────────────────
+
+/**
+ * Get the token balance for a specific mint in a wallet.
+ * Returns the raw amount (smallest unit).
+ */
+export async function getTokenBalance(
+  walletAddress: string,
+  mintAddress: string
+): Promise<number> {
+  const connection = getConnection();
+  const walletPubkey = new PublicKey(walletAddress);
+  const mintPubkey = new PublicKey(mintAddress);
+
+  const ata = getAssociatedTokenAddressSync(
+    mintPubkey,
+    walletPubkey,
+    false,
+    TOKEN_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  );
+
+  try {
+    const account = await getAccount(connection, ata);
+    return Number(account.amount);
+  } catch {
+    // Account doesn't exist or has no balance
+    return 0;
+  }
+}
+
+/**
+ * Get the server wallet's balance for a specific token.
+ */
+export async function getServerTokenBalance(mintAddress: string): Promise<number> {
+  const serverKeypair = getServerKeypair();
+  return getTokenBalance(serverKeypair.publicKey.toBase58(), mintAddress);
 }
 
 // ─── Position Queries ────────────────────────────────────────

@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { createOrder, getOutcomeMints, USDC_MINT, getOrderStatus } from "@/lib/dflow";
-import { signAndSendDFlowTransaction, confirmTransaction, getServerKeypair } from "@/lib/solana";
+import {
+  signAndSendDFlowTransaction,
+  confirmTransaction,
+  getServerKeypair,
+} from "@/lib/solana";
 import { createGift, updateGift } from "@/lib/gifts";
 
 /**
@@ -124,7 +128,20 @@ export async function POST(req: Request) {
     }
 
     // 6. Update gift to pending_claim
-    const tokensReceived = parseInt(orderResponse.quote.outputAmount || "0");
+    // Parse the output amount from DFlow quote (returned as string)
+    const tokensReceived = Number(orderResponse.quote.outputAmount || "0");
+
+    if (tokensReceived <= 0) {
+      console.error("[Gift Create] Invalid token amount from quote:", orderResponse.quote);
+      await updateGift(gift.id, { status: "expired" });
+      return NextResponse.json(
+        { error: "Trade completed but received zero tokens" },
+        { status: 500 }
+      );
+    }
+
+    console.log("[Gift Create] Tokens received:", tokensReceived, "for gift:", gift.id);
+
     await updateGift(gift.id, {
       status: "pending_claim",
       tokenAmount: tokensReceived,
@@ -157,11 +174,16 @@ export async function POST(req: Request) {
       }
     }
 
+    // Convert raw token amount to human-readable (DFlow tokens have 6 decimals)
+    const TOKEN_DECIMALS = 6;
+    const displayTokensReceived = tokensReceived / Math.pow(10, TOKEN_DECIMALS);
+
     return NextResponse.json({
       giftId: gift.id,
       claimUrl,
       signature,
-      tokensReceived,
+      tokensReceived: displayTokensReceived, // Human-readable (e.g., 8.0 shares)
+      rawTokensReceived: tokensReceived, // Raw amount
       executionMode: orderResponse.executionMode,
     });
   } catch (error: any) {

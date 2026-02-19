@@ -53,11 +53,25 @@ export async function POST(req: Request) {
       await new Promise((r) => setTimeout(r, 1500)); // Simulate processing
     } else {
       // ─── PRODUCTION MODE: Real token transfer ───────────────
+      // Ensure amount is an integer (SPL token transfers require whole units)
+      const transferAmount = Math.floor(gift.tokenAmount);
+
+      if (transferAmount <= 0) {
+        return NextResponse.json(
+          { error: "Invalid token amount for transfer" },
+          { status: 400 }
+        );
+      }
+
+      console.log("[Claim] Transferring", transferAmount, "tokens to", recipientWalletAddress);
+
       signature = await transferOutcomeTokens({
         outcomeMint: gift.outcomeMint,
         recipientAddress: recipientWalletAddress,
-        amount: gift.tokenAmount,
+        amount: transferAmount,
       });
+
+      console.log("[Claim] Transfer complete, signature:", signature);
     }
 
     // Update gift record
@@ -104,12 +118,17 @@ export async function GET(req: Request) {
   }
 
   // Return public-safe gift info (no sender privy ID, no wallet keys)
+  // Convert raw token amount to human-readable (DFlow tokens have 6 decimals)
+  const TOKEN_DECIMALS = 6;
+  const displayTokenAmount = gift.tokenAmount / Math.pow(10, TOKEN_DECIMALS);
+
   return NextResponse.json({
     id: gift.id,
     marketTicker: gift.marketTicker,
     marketTitle: gift.marketTitle,
     side: gift.side,
-    tokenAmount: gift.tokenAmount,
+    tokenAmount: displayTokenAmount, // Human-readable shares (e.g., 8.0 instead of 8000000)
+    rawTokenAmount: gift.tokenAmount, // Raw amount for reference
     costUSDC: gift.costUSDC,
     senderName: "Someone", // Don't expose sender details publicly
     recipientName: gift.recipientName,

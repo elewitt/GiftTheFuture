@@ -108,7 +108,8 @@ export async function getMarket(ticker: string): Promise<DFlowMarket> {
 
   if (!res.ok) throw new Error(`Market not found: ${ticker}`);
   const data = await res.json();
-  return data.market;
+  // DFlow API returns the market object directly, not wrapped in { market: ... }
+  return data;
 }
 
 /**
