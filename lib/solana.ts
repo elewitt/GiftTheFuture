@@ -301,12 +301,17 @@ export async function getPositions(
     const market = await getMarketByMint(holding.mint);
 
     if (market) {
-      const side =
-        holding.mint === market.accounts.yesMint
-          ? "YES"
-          : holding.mint === market.accounts.noMint
-            ? "NO"
-            : "UNKNOWN";
+      // Find which side (YES/NO) this mint represents
+      let side: "YES" | "NO" | "UNKNOWN" = "UNKNOWN";
+      for (const collateral of Object.values(market.accounts)) {
+        if (holding.mint === collateral.yesMint) {
+          side = "YES";
+          break;
+        } else if (holding.mint === collateral.noMint) {
+          side = "NO";
+          break;
+        }
+      }
 
       positions.push({
         mint: holding.mint,
@@ -317,7 +322,7 @@ export async function getPositions(
           title: market.title,
           status: market.status,
         },
-        side: side as "YES" | "NO" | "UNKNOWN",
+        side,
       });
     }
   }
