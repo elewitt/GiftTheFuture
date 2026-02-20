@@ -35,7 +35,9 @@ export async function POST(req: Request) {
     return NextResponse.json({
       transaction: order.transaction,
       executionMode: order.executionMode,
-      quote: order.quote,
+      inAmount: order.inAmount,
+      outAmount: order.outAmount,
+      minOutAmount: order.minOutAmount,
     });
   } catch (error: any) {
     console.error("[/api/gift/redeem] Error:", error);
