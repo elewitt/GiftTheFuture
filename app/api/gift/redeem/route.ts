@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createRedemptionOrder, getMarketByMint } from "@/lib/dflow";
+import { getTokenBalance } from "@/lib/solana";
 
 /**
  * POST /api/gift/redeem
@@ -22,6 +23,24 @@ export async function POST(req: Request) {
     if (!outcomeMint || !amount || !userPublicKey) {
       return NextResponse.json(
         { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    // Check if user actually has the tokens
+    const balance = await getTokenBalance(userPublicKey, outcomeMint);
+    console.log("[/api/gift/redeem] User token balance:", balance, "requested:", amount);
+
+    if (balance <= 0) {
+      return NextResponse.json(
+        { error: "No tokens found in your wallet. The claim may not have completed successfully." },
+        { status: 400 }
+      );
+    }
+
+    if (balance < amount) {
+      return NextResponse.json(
+        { error: `Insufficient balance. You have ${balance} tokens but tried to sell ${amount}.` },
         { status: 400 }
       );
     }
