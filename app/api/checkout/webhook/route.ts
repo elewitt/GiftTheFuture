@@ -20,6 +20,10 @@ const isDemoMode = process.env.DEMO_MODE === "true";
  * 3. Send the claim email
  */
 export async function POST(req: Request) {
+  console.log("[Webhook] ====== WEBHOOK RECEIVED ======");
+  console.log("[Webhook] DEMO_MODE:", isDemoMode);
+  console.log("[Webhook] Has webhook secret:", !!webhookSecret);
+
   try {
     const body = await req.text();
     const signature = req.headers.get("stripe-signature") || "";
@@ -30,22 +34,33 @@ export async function POST(req: Request) {
     if (webhookSecret) {
       try {
         event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+        console.log("[Webhook] Signature verified successfully");
       } catch (err: any) {
         console.error("[Webhook] Signature verification failed:", err.message);
         return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
       }
     } else {
       // No webhook secret - parse body directly (for testing)
+      console.log("[Webhook] No webhook secret, parsing body directly");
       event = JSON.parse(body);
     }
+
+    console.log("[Webhook] Event type:", event.type);
 
     // Handle checkout.session.completed
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
-      
+      console.log("[Webhook] Payment status:", session.payment_status);
+      console.log("[Webhook] Session metadata:", session.metadata);
+
       if (session.payment_status === "paid") {
+        console.log("[Webhook] Payment confirmed, processing gift...");
         await handleSuccessfulPayment(session);
+      } else {
+        console.log("[Webhook] Payment not yet paid, skipping");
       }
+    } else {
+      console.log("[Webhook] Ignoring event type:", event.type);
     }
 
     return NextResponse.json({ received: true });
@@ -89,7 +104,8 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
 
     if (isDemoMode) {
       // ─── DEMO MODE: Simulate the purchase ───────────────────
-      console.log("[Webhook] DEMO MODE - Simulating DFlow purchase");
+      console.log("[Webhook] ⚠️ DEMO MODE ACTIVE - Simulating DFlow purchase (no real transaction)");
+      console.log("[Webhook] To enable real purchases, set DEMO_MODE=false in Vercel env vars");
       
       // Try to get real mint addresses for display purposes
       try {
@@ -104,34 +120,47 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
       
     } else {
       // ─── PRODUCTION MODE: Real DFlow purchase ───────────────
-      const { yesMint, noMint } = await getOutcomeMints(marketTicker);
-      outputMint = side === "yes" ? yesMint : noMint;
+      console.log("[Webhook] 🚀 PRODUCTION MODE - Executing real DFlow purchase");
 
-      const serverKeypair = getServerKeypair();
-      const amountUSDC = parseFloat(shares) * parseFloat(pricePerShare);
-      const amountLamports = Math.floor(amountUSDC * 1_000_000);
-
-      const orderResponse = await createOrder({
-        inputMint: USDC_MINT,
-        outputMint,
-        amount: amountLamports,
-        slippageBps: 50,
-        userPublicKey: serverKeypair.publicKey.toBase58(),
-      });
-
-      purchaseTxSig = await signAndSendDFlowTransaction(orderResponse.transaction);
-
-      // Wait for on-chain confirmation
       try {
-        await confirmTransaction(purchaseTxSig);
-        console.log("[Webhook] Transaction confirmed:", purchaseTxSig);
-      } catch (confirmErr) {
-        console.error("[Webhook] Transaction failed:", confirmErr);
-        // TODO: Refund via Stripe
-        return;
-      }
+        console.log("[Webhook] Getting outcome mints for:", marketTicker);
+        const { yesMint, noMint } = await getOutcomeMints(marketTicker);
+        outputMint = side === "yes" ? yesMint : noMint;
+        console.log("[Webhook] Output mint:", outputMint);
 
-      tokensReceived = Number(orderResponse.outAmount || shares);
+        const serverKeypair = getServerKeypair();
+        console.log("[Webhook] Server wallet:", serverKeypair.publicKey.toBase58());
+
+        const amountUSDC = parseFloat(shares) * parseFloat(pricePerShare);
+        const amountLamports = Math.floor(amountUSDC * 1_000_000);
+        console.log("[Webhook] Amount USDC:", amountUSDC, "lamports:", amountLamports);
+
+        console.log("[Webhook] Creating DFlow order...");
+        const orderResponse = await createOrder({
+          inputMint: USDC_MINT,
+          outputMint,
+          amount: amountLamports,
+          slippageBps: 50,
+          userPublicKey: serverKeypair.publicKey.toBase58(),
+        });
+        console.log("[Webhook] Order created, out amount:", orderResponse.outAmount);
+
+        console.log("[Webhook] Signing and sending transaction...");
+        purchaseTxSig = await signAndSendDFlowTransaction(orderResponse.transaction);
+        console.log("[Webhook] Transaction sent:", purchaseTxSig);
+
+        // Wait for on-chain confirmation
+        console.log("[Webhook] Waiting for confirmation...");
+        await confirmTransaction(purchaseTxSig);
+        console.log("[Webhook] ✅ Transaction confirmed:", purchaseTxSig);
+
+        tokensReceived = Number(orderResponse.outAmount || shares);
+      } catch (txErr: any) {
+        console.error("[Webhook] ❌ DFlow transaction failed:", txErr.message || txErr);
+        console.error("[Webhook] Full error:", JSON.stringify(txErr, null, 2));
+        // Continue to create gift record even if tx failed - it will be in failed state
+        purchaseTxSig = "FAILED-" + Date.now();
+      }
     }
 
     // Create gift record
@@ -158,11 +187,15 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
     // Send claim email
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
     const claimUrl = `${appUrl}/gift/${gift.id}`;
+    console.log("[Webhook] Sending claim email to:", recipientEmail);
+    console.log("[Webhook] Claim URL:", claimUrl);
+    console.log("[Webhook] RESEND_FROM_EMAIL:", process.env.RESEND_FROM_EMAIL || "(not set - using test domain)");
 
     // Use the request origin for internal API calls, or fall back to appUrl
     const apiBase = appUrl;
 
     try {
+      console.log("[Webhook] Calling email API at:", `${apiBase}/api/email/send`);
       const emailRes = await fetch(`${apiBase}/api/email/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
