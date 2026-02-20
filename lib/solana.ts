@@ -86,29 +86,50 @@ export async function signAndSendDFlowTransaction(
   const connection = getConnection();
   const keypair = getServerKeypair();
   const txBuffer = Buffer.from(base64Transaction, "base64");
+  const txBytes = new Uint8Array(txBuffer);
 
-  // Try versioned first (DFlow typically returns VersionedTransaction)
-  try {
-    const vtx = VersionedTransaction.deserialize(new Uint8Array(txBuffer));
-    vtx.sign([keypair]);
+  console.log("[Solana] Transaction buffer length:", txBuffer.length);
+  console.log("[Solana] First byte:", txBytes[0], "(0 = versioned, other = legacy)");
 
-    const signature = await connection.sendRawTransaction(vtx.serialize(), {
-      skipPreflight: false,
-      maxRetries: 3,
-    });
+  // Check first byte: 0 indicates versioned transaction
+  const isVersioned = txBytes[0] === 0 || txBytes[0] === 128; // 0x00 or 0x80
 
-    return signature;
-  } catch {
-    // Fallback to legacy transaction
-    const tx = Transaction.from(txBuffer);
-    tx.sign(keypair);
+  if (isVersioned) {
+    console.log("[Solana] Deserializing as VersionedTransaction...");
+    try {
+      const vtx = VersionedTransaction.deserialize(txBytes);
+      console.log("[Solana] Versioned transaction deserialized, signing...");
+      vtx.sign([keypair]);
 
-    const signature = await connection.sendRawTransaction(tx.serialize(), {
-      skipPreflight: false,
-      maxRetries: 3,
-    });
+      console.log("[Solana] Sending versioned transaction...");
+      const signature = await connection.sendRawTransaction(vtx.serialize(), {
+        skipPreflight: false,
+        maxRetries: 3,
+      });
 
-    return signature;
+      console.log("[Solana] Transaction sent:", signature);
+      return signature;
+    } catch (err: any) {
+      console.error("[Solana] Versioned transaction failed:", err.message);
+      throw err;
+    }
+  } else {
+    console.log("[Solana] Deserializing as legacy Transaction...");
+    try {
+      const tx = Transaction.from(txBuffer);
+      tx.sign(keypair);
+
+      const signature = await connection.sendRawTransaction(tx.serialize(), {
+        skipPreflight: false,
+        maxRetries: 3,
+      });
+
+      console.log("[Solana] Legacy transaction sent:", signature);
+      return signature;
+    } catch (err: any) {
+      console.error("[Solana] Legacy transaction failed:", err.message);
+      throw err;
+    }
   }
 }
 
