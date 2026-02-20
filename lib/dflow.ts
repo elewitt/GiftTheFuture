@@ -41,14 +41,20 @@ export interface DFlowEvent {
   markets?: DFlowMarket[];
 }
 
+export interface DFlowMarketAccounts {
+  yesMint: string;
+  noMint: string;
+  marketLedger?: string;
+  isInitialized?: boolean;
+  redemptionStatus?: string;
+}
+
 export interface DFlowMarket {
   ticker: string;
   title: string;
   status: string;
   accounts: {
-    yesMint: string;
-    noMint: string;
-    [key: string]: string;
+    [collateralMint: string]: DFlowMarketAccounts;
   };
   yes_price?: number;
   no_price?: number;
