@@ -4,7 +4,10 @@ import { usePrivy, useLogin } from "@privy-io/react-auth";
 import { useSolanaWallets } from "@privy-io/react-auth/solana";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { VersionedTransaction } from "@solana/web3.js";
+import { VersionedTransaction, Connection, PublicKey, Transaction } from "@solana/web3.js";
+import { getAssociatedTokenAddressSync, createTransferInstruction, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+
+const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
 interface Position {
   id: string;
@@ -77,6 +80,17 @@ interface CashoutState {
   usdcReceived: number | null;
 }
 
+type WithdrawStep = "form" | "confirming" | "sending" | "done" | "error";
+
+interface WithdrawState {
+  isOpen: boolean;
+  step: WithdrawStep;
+  destinationAddress: string;
+  amount: string;
+  error: string | null;
+  signature: string | null;
+}
+
 export default function DashboardPage() {
   const { ready, authenticated, user, logout } = usePrivy();
   const { login } = useLogin();
@@ -95,6 +109,20 @@ export default function DashboardPage() {
     signature: null,
     usdcReceived: null,
   });
+
+  // Withdraw modal state
+  const [withdraw, setWithdraw] = useState<WithdrawState>({
+    isOpen: false,
+    step: "form",
+    destinationAddress: "",
+    amount: "",
+    error: null,
+    signature: null,
+  });
+
+  // USDC balance
+  const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
+  const [solBalance, setSolBalance] = useState<number | null>(null);
 
   useEffect(() => {
     if (!authenticated || !user) return;
@@ -127,6 +155,43 @@ export default function DashboardPage() {
 
     fetchDashboard();
   }, [authenticated, user]);
+
+  // Fetch USDC and SOL balances
+  useEffect(() => {
+    if (!wallets.length) return;
+
+    const wallet = wallets.find((w) => w.walletClientType === "privy") || wallets[0];
+    if (!wallet?.address) return;
+
+    async function fetchBalances() {
+      try {
+        const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+        const connection = new Connection(rpcUrl, "confirmed");
+        const pubkey = new PublicKey(wallet.address);
+
+        // Fetch SOL balance
+        const solBal = await connection.getBalance(pubkey);
+        setSolBalance(solBal / 1_000_000_000); // Convert lamports to SOL
+
+        // Fetch USDC balance
+        try {
+          const usdcMint = new PublicKey(USDC_MINT);
+          const ata = getAssociatedTokenAddressSync(usdcMint, pubkey);
+          const tokenBalance = await connection.getTokenAccountBalance(ata);
+          setUsdcBalance(Number(tokenBalance.value.uiAmount) || 0);
+        } catch {
+          setUsdcBalance(0); // No USDC account
+        }
+      } catch (err) {
+        console.error("Failed to fetch balances:", err);
+      }
+    }
+
+    fetchBalances();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchBalances, 30000);
+    return () => clearInterval(interval);
+  }, [wallets]);
 
   // Cashout handler
   const handleCashout = useCallback(async () => {
@@ -249,6 +314,134 @@ export default function DashboardPage() {
     });
   };
 
+  // Withdraw handlers
+  const openWithdrawModal = () => {
+    setWithdraw({
+      isOpen: true,
+      step: "form",
+      destinationAddress: "",
+      amount: usdcBalance?.toFixed(2) || "",
+      error: null,
+      signature: null,
+    });
+  };
+
+  const closeWithdrawModal = () => {
+    setWithdraw({
+      isOpen: false,
+      step: "form",
+      destinationAddress: "",
+      amount: "",
+      error: null,
+      signature: null,
+    });
+  };
+
+  const handleWithdraw = useCallback(async () => {
+    const wallet = wallets.find((w) => w.walletClientType === "privy") || wallets[0];
+    if (!wallet) {
+      setWithdraw((prev) => ({ ...prev, step: "error", error: "No wallet found" }));
+      return;
+    }
+
+    const amount = parseFloat(withdraw.amount);
+    if (isNaN(amount) || amount <= 0) {
+      setWithdraw((prev) => ({ ...prev, step: "error", error: "Invalid amount" }));
+      return;
+    }
+
+    if (amount > (usdcBalance || 0)) {
+      setWithdraw((prev) => ({ ...prev, step: "error", error: "Insufficient USDC balance" }));
+      return;
+    }
+
+    let destinationPubkey: PublicKey;
+    try {
+      destinationPubkey = new PublicKey(withdraw.destinationAddress);
+    } catch {
+      setWithdraw((prev) => ({ ...prev, step: "error", error: "Invalid Solana wallet address" }));
+      return;
+    }
+
+    try {
+      setWithdraw((prev) => ({ ...prev, step: "confirming" }));
+
+      const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+      const connection = new Connection(rpcUrl, "confirmed");
+      const senderPubkey = new PublicKey(wallet.address);
+      const usdcMint = new PublicKey(USDC_MINT);
+
+      // Get ATAs
+      const senderATA = getAssociatedTokenAddressSync(usdcMint, senderPubkey);
+      const destinationATA = getAssociatedTokenAddressSync(usdcMint, destinationPubkey);
+
+      // Build transaction
+      const tx = new Transaction();
+
+      // Check if destination ATA exists, if not create it
+      const destATAInfo = await connection.getAccountInfo(destinationATA);
+      if (!destATAInfo) {
+        const { createAssociatedTokenAccountInstruction } = await import("@solana/spl-token");
+        tx.add(
+          createAssociatedTokenAccountInstruction(
+            senderPubkey, // payer
+            destinationATA, // ATA address
+            destinationPubkey, // owner
+            usdcMint // mint
+          )
+        );
+      }
+
+      // Add transfer instruction
+      const amountLamports = Math.floor(amount * 1_000_000); // USDC has 6 decimals
+      tx.add(
+        createTransferInstruction(
+          senderATA,
+          destinationATA,
+          senderPubkey,
+          amountLamports
+        )
+      );
+
+      // Set recent blockhash and fee payer
+      const latestBlockhash = await connection.getLatestBlockhash();
+      tx.recentBlockhash = latestBlockhash.blockhash;
+      tx.feePayer = senderPubkey;
+
+      setWithdraw((prev) => ({ ...prev, step: "sending" }));
+
+      // Sign with Privy wallet
+      const signedTx = await wallet.signTransaction(tx);
+
+      // Send transaction
+      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: false,
+        maxRetries: 3,
+      });
+
+      // Wait for confirmation
+      await connection.confirmTransaction({
+        signature,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      });
+
+      setWithdraw((prev) => ({ ...prev, step: "done", signature }));
+
+      // Update balance after a delay
+      setTimeout(() => {
+        setUsdcBalance((prev) => (prev || 0) - amount);
+      }, 2000);
+    } catch (err: any) {
+      console.error("Withdraw error:", err);
+      setWithdraw((prev) => ({
+        ...prev,
+        step: "error",
+        error: err.message || "Withdrawal failed",
+      }));
+    }
+  }, [withdraw.destinationAddress, withdraw.amount, wallets, usdcBalance]);
+
   if (!ready) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-950 to-slate-900">
@@ -332,6 +525,40 @@ export default function DashboardPage() {
               subtext={data.summary.pendingCount > 0 ? `${data.summary.pendingCount} pending` : "All claimed"}
               color="violet"
             />
+          </div>
+        )}
+
+        {/* Wallet Balance Card */}
+        {wallets.length > 0 && (
+          <div className="mb-6 p-5 rounded-2xl bg-gradient-to-br from-emerald-500/5 to-teal-500/5 border border-emerald-500/20">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Wallet Balance</p>
+                <p className="text-2xl font-bold text-emerald-400">
+                  ${usdcBalance !== null ? usdcBalance.toFixed(2) : "—"} <span className="text-base font-normal text-slate-500">USDC</span>
+                </p>
+                <p className="text-xs text-slate-600 mt-1">
+                  {solBalance !== null ? `${solBalance.toFixed(4)} SOL for fees` : "Loading..."}
+                </p>
+              </div>
+              <button
+                onClick={openWithdrawModal}
+                disabled={!usdcBalance || usdcBalance <= 0}
+                className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition ${
+                  usdcBalance && usdcBalance > 0
+                    ? "bg-emerald-500 text-white hover:bg-emerald-400"
+                    : "bg-slate-800 text-slate-500 cursor-not-allowed"
+                }`}
+              >
+                Withdraw USDC
+              </button>
+            </div>
+            <div className="pt-3 border-t border-slate-800/50">
+              <p className="text-[10px] text-slate-600 mb-1">Your wallet address</p>
+              <p className="text-xs text-slate-400 font-mono break-all">
+                {wallets.find((w) => w.walletClientType === "privy")?.address || wallets[0]?.address}
+              </p>
+            </div>
           </div>
         )}
 
@@ -421,6 +648,18 @@ export default function DashboardPage() {
           cashout={cashout}
           onConfirm={handleCashout}
           onClose={closeCashoutModal}
+        />
+      )}
+
+      {/* Withdraw Modal */}
+      {withdraw.isOpen && (
+        <WithdrawModal
+          withdraw={withdraw}
+          usdcBalance={usdcBalance || 0}
+          onAmountChange={(amount) => setWithdraw((prev) => ({ ...prev, amount }))}
+          onAddressChange={(address) => setWithdraw((prev) => ({ ...prev, destinationAddress: address }))}
+          onConfirm={handleWithdraw}
+          onClose={closeWithdrawModal}
         />
       )}
     </div>
@@ -931,6 +1170,204 @@ function CashoutModal({
       {/* Modal */}
       <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
         {(cashout.step === "confirm" || cashout.step === "error" || cashout.step === "done") && (
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1 text-slate-600 hover:text-slate-400 transition"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+        {stepContent()}
+      </div>
+    </div>
+  );
+}
+
+function WithdrawModal({
+  withdraw,
+  usdcBalance,
+  onAmountChange,
+  onAddressChange,
+  onConfirm,
+  onClose,
+}: {
+  withdraw: WithdrawState;
+  usdcBalance: number;
+  onAmountChange: (amount: string) => void;
+  onAddressChange: (address: string) => void;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const stepContent = () => {
+    switch (withdraw.step) {
+      case "form":
+        return (
+          <>
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">💸</span>
+              </div>
+              <h3 className="text-xl font-bold text-slate-100 mb-2">Withdraw USDC</h3>
+              <p className="text-sm text-slate-500">
+                Send USDC to any Solana wallet
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-xs text-slate-500 uppercase tracking-wide mb-2">
+                Destination Wallet Address
+              </label>
+              <input
+                type="text"
+                placeholder="Enter Solana wallet address..."
+                value={withdraw.destinationAddress}
+                onChange={(e) => onAddressChange(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700/50 text-slate-200 text-sm placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50 font-mono"
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-xs text-slate-500 uppercase tracking-wide mb-2">
+                Amount (USDC)
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max={usdcBalance}
+                  placeholder="0.00"
+                  value={withdraw.amount}
+                  onChange={(e) => onAmountChange(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700/50 text-slate-200 text-sm placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50"
+                />
+                <button
+                  onClick={() => onAmountChange(usdcBalance.toFixed(2))}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition"
+                >
+                  MAX
+                </button>
+              </div>
+              <p className="text-xs text-slate-600 mt-1">
+                Available: ${usdcBalance.toFixed(2)} USDC
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-6">
+              <p className="text-xs text-amber-400">
+                <strong>Note:</strong> You'll need a small amount of SOL in your wallet to pay for transaction fees (~0.001 SOL).
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-medium hover:bg-slate-700 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={onConfirm}
+                disabled={!withdraw.destinationAddress || !withdraw.amount}
+                className={`flex-1 py-3 rounded-xl text-sm font-bold transition ${
+                  withdraw.destinationAddress && withdraw.amount
+                    ? "bg-emerald-500 text-white hover:bg-emerald-400"
+                    : "bg-slate-800 text-slate-500 cursor-not-allowed"
+                }`}
+              >
+                Withdraw
+              </button>
+            </div>
+          </>
+        );
+
+      case "confirming":
+        return (
+          <div className="text-center py-8">
+            <div className="w-12 h-12 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-slate-100 mb-2">Preparing Transaction</h3>
+            <p className="text-sm text-slate-500">Building your withdrawal...</p>
+          </div>
+        );
+
+      case "sending":
+        return (
+          <div className="text-center py-8">
+            <div className="w-12 h-12 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-slate-100 mb-2">Sign Transaction</h3>
+            <p className="text-sm text-slate-500">Please approve in your wallet...</p>
+          </div>
+        );
+
+      case "done":
+        return (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">✅</span>
+            </div>
+            <h3 className="text-xl font-bold text-slate-100 mb-2">Withdrawal Complete!</h3>
+            <p className="text-sm text-slate-500 mb-4">
+              Sent <span className="text-emerald-400 font-semibold">${withdraw.amount} USDC</span>
+            </p>
+            {withdraw.signature && (
+              <a
+                href={`https://solscan.io/tx/${withdraw.signature}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block px-4 py-2 rounded-lg bg-slate-800 text-slate-300 text-sm hover:bg-slate-700 transition"
+              >
+                View Transaction →
+              </a>
+            )}
+            <button
+              onClick={onClose}
+              className="block w-full mt-4 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-medium hover:bg-slate-700 transition"
+            >
+              Close
+            </button>
+          </div>
+        );
+
+      case "error":
+        return (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">❌</span>
+            </div>
+            <h3 className="text-xl font-bold text-slate-100 mb-2">Withdrawal Failed</h3>
+            <p className="text-sm text-red-400 mb-6">{withdraw.error}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-medium hover:bg-slate-700 transition"
+              >
+                Close
+              </button>
+              <button
+                onClick={onConfirm}
+                className="flex-1 py-3 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-400 transition"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={withdraw.step === "form" || withdraw.step === "error" || withdraw.step === "done" ? onClose : undefined}
+      />
+
+      {/* Modal */}
+      <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+        {(withdraw.step === "form" || withdraw.step === "error" || withdraw.step === "done") && (
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-1 text-slate-600 hover:text-slate-400 transition"
