@@ -171,8 +171,9 @@ export default function DashboardPage() {
       const signedTx = await wallet.signTransaction(transaction);
 
       // Send the transaction
+      const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
       const connection = new (await import("@solana/web3.js")).Connection(
-        "https://api.mainnet-beta.solana.com",
+        rpcUrl,
         "confirmed"
       );
 
