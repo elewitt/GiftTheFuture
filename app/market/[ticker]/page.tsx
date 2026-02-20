@@ -75,6 +75,11 @@ export default function MarketPage() {
   const cost = (shares * selectedPrice).toFixed(2);
   const potentialPayout = shares.toFixed(2);
 
+  // Minimum order amount for DFlow
+  const MIN_ORDER_AMOUNT = 2.5;
+  const orderAmount = shares * selectedPrice;
+  const isBelowMinimum = orderAmount < MIN_ORDER_AMOUNT;
+
   async function handleCheckout() {
     if (!authenticated) {
       login();
@@ -88,6 +93,11 @@ export default function MarketPage() {
 
     if (!recipientContact.includes("@")) {
       setCheckoutError("Please enter a valid email address");
+      return;
+    }
+
+    if (isBelowMinimum) {
+      setCheckoutError(`Minimum order is $${MIN_ORDER_AMOUNT.toFixed(2)}. Please add more shares.`);
       return;
     }
 
@@ -336,7 +346,7 @@ export default function MarketPage() {
                 </label>
                 <div className="flex items-center justify-center gap-4 mb-3">
                   <button
-                    onClick={() => setShares(Math.max(1, shares - 5))}
+                    onClick={() => setShares(Math.max(5, shares - 5))}
                     className="w-12 h-12 rounded-xl bg-slate-800 text-slate-300 text-xl font-bold hover:bg-slate-700 transition"
                   >
                     −
@@ -422,8 +432,13 @@ export default function MarketPage() {
                 </div>
                 <div className="flex justify-between text-sm pt-2 border-t border-slate-700/50">
                   <span className="text-slate-300 font-semibold">Total</span>
-                  <span className="text-slate-100 font-bold text-xl">${cost}</span>
+                  <span className={`font-bold text-xl ${isBelowMinimum ? "text-amber-400" : "text-slate-100"}`}>${cost}</span>
                 </div>
+                {isBelowMinimum && (
+                  <p className="text-xs text-amber-400 mt-2">
+                    Minimum order is ${MIN_ORDER_AMOUNT.toFixed(2)}
+                  </p>
+                )}
                 <div className="flex justify-between text-xs mt-3 pt-2 border-t border-slate-700/30">
                   <span className="text-slate-600">If {side.toUpperCase()} wins</span>
                   <span className="text-emerald-400 font-bold">${potentialPayout} payout</span>
