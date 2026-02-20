@@ -60,6 +60,9 @@ export async function GET(req: Request) {
         const searchText = `${m.title || ""} ${m.ticker || ""} ${m.eventTicker || ""}`.toLowerCase();
         return searchText.includes(query);
       });
+    } else {
+      // Default: Focus on sports championship futures
+      allMarkets = allMarkets.filter(m => isSportsChampionship(m.ticker, m.title));
     }
 
     // Sort by volume (highest first)
@@ -112,6 +115,52 @@ function transformDFlowMarket(m: DFlowMarketFull) {
     closeTime: m.closeTime ? new Date(m.closeTime * 1000).toISOString() : "",
     expirationTime: m.expirationTime ? new Date(m.expirationTime * 1000).toISOString() : "",
   };
+}
+
+/**
+ * Check if a market is a sports championship/finals market
+ */
+function isSportsChampionship(ticker: string, title: string): boolean {
+  const t = (ticker || "").toUpperCase();
+  const titleLower = (title || "").toLowerCase();
+
+  // Sports league tickers
+  const sportsLeagues = [
+    "KXNBA",      // NBA
+    "KXNFL",      // NFL
+    "KXMLB",      // MLB
+    "KXNHL",      // NHL
+    "KXMARMAD",   // March Madness / College Basketball
+    "KXNCAA",     // NCAA
+    "KXSB",       // Super Bowl
+    "KXWOMARMAD", // Women's March Madness
+    "KXCFP",      // College Football Playoff
+    "KXOLYMPICS", // Olympics
+    "KXWORLDCUP", // World Cup
+    "KXPREMIER",  // Premier League
+    "KXCHAMPIONS",// Champions League
+    "KXWORLDSERIES", // World Series
+    "KXSTANLEY",  // Stanley Cup
+  ];
+
+  // Check if ticker starts with any sports league
+  const isSportsLeague = sportsLeagues.some(league => t.startsWith(league));
+
+  // Championship keywords in title
+  const championshipKeywords = [
+    "champion", "championship", "finals", "win the",
+    "super bowl", "world series", "stanley cup",
+    "march madness", "national championship",
+    "playoff", "olympics", "gold medal"
+  ];
+
+  const hasChampionshipKeyword = championshipKeywords.some(kw => titleLower.includes(kw));
+
+  // Exclude MVP, individual player props, round leaders, etc.
+  const excludeKeywords = ["mvp", "leader", "round 1", "round 2", "top scorer", "award"];
+  const isExcluded = excludeKeywords.some(kw => titleLower.includes(kw));
+
+  return (isSportsLeague || hasChampionshipKeyword) && !isExcluded;
 }
 
 function extractCategory(ticker: string): string {
