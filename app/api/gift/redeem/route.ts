@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createRedemptionOrder } from "@/lib/dflow";
+import { createRedemptionOrder, getMarketByMint } from "@/lib/dflow";
 
 /**
  * POST /api/gift/redeem
@@ -17,9 +17,22 @@ export async function POST(req: Request) {
   try {
     const { outcomeMint, amount, userPublicKey } = await req.json();
 
+    console.log("[/api/gift/redeem] Request:", { outcomeMint, amount, userPublicKey });
+
     if (!outcomeMint || !amount || !userPublicKey) {
       return NextResponse.json(
         { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    // Check if the market is still active
+    const market = await getMarketByMint(outcomeMint);
+    console.log("[/api/gift/redeem] Market lookup:", market);
+
+    if (market && market.status !== "active" && market.status !== "open") {
+      return NextResponse.json(
+        { error: `Market is ${market.status}. Cashout is only available for active markets.` },
         { status: 400 }
       );
     }
@@ -32,6 +45,12 @@ export async function POST(req: Request) {
       userPublicKey,
     });
 
+    console.log("[/api/gift/redeem] Order created:", {
+      executionMode: order.executionMode,
+      inAmount: order.inAmount,
+      outAmount: order.outAmount,
+    });
+
     return NextResponse.json({
       transaction: order.transaction,
       executionMode: order.executionMode,
@@ -40,7 +59,16 @@ export async function POST(req: Request) {
       minOutAmount: order.minOutAmount,
     });
   } catch (error: any) {
-    console.error("[/api/gift/redeem] Error:", error);
+    console.error("[/api/gift/redeem] Error:", error.message);
+
+    // Provide more helpful error messages
+    if (error.message?.includes("route_not_found")) {
+      return NextResponse.json(
+        { error: "No liquidity available. The market may be closed or have insufficient trading volume." },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: error.message || "Redemption failed" },
       { status: 500 }
