@@ -24,6 +24,11 @@ export async function GET(req: Request) {
       );
     }
 
+    // Build sender query - match by Privy ID OR email (since gifts created via Stripe use email)
+    const senderConditions = [];
+    if (privyId) senderConditions.push({ senderPrivyId: privyId });
+    if (email) senderConditions.push({ senderPrivyId: email });
+
     // Fetch gifts in parallel
     const [claimedGifts, sentGifts, pendingGifts] = await Promise.all([
       // Gifts this user has claimed (their positions)
@@ -37,10 +42,10 @@ export async function GET(req: Request) {
           })
         : [],
 
-      // Gifts this user has sent
-      privyId
+      // Gifts this user has sent (match by Privy ID or email)
+      senderConditions.length > 0
         ? prisma.gift.findMany({
-            where: { senderPrivyId: privyId },
+            where: { OR: senderConditions },
             orderBy: { createdAt: "desc" },
           })
         : [],

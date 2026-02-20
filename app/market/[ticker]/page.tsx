@@ -109,6 +109,7 @@ export default function MarketPage() {
           recipientName,
           giftMessage,
           senderEmail: user?.email?.address || "",
+          senderPrivyId: user?.id || "",
         }),
       });
 

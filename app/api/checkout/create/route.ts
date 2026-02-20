@@ -36,6 +36,7 @@ export async function POST(req: Request) {
       recipientName,
       giftMessage,
       senderEmail,
+      senderPrivyId,
     } = body;
 
     // Validate
@@ -86,6 +87,7 @@ export async function POST(req: Request) {
         recipientName: recipientName || "",
         giftMessage: giftMessage || "",
         senderEmail: senderEmail || "",
+        senderPrivyId: senderPrivyId || "",
       },
     });
 

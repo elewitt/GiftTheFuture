@@ -71,6 +71,7 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
     recipientName,
     giftMessage,
     senderEmail,
+    senderPrivyId,
   } = metadata;
 
   console.log("[Webhook] Processing gift purchase:", {
@@ -141,7 +142,7 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
       outcomeMint: outputMint,
       tokenAmount: tokensReceived,
       costUSDC: parseFloat(shares) * parseFloat(pricePerShare),
-      senderPrivyId: senderEmail || "stripe-" + session.id,
+      senderPrivyId: senderPrivyId || senderEmail || "stripe-" + session.id,
       recipientName: recipientName || "",
       recipientContact: recipientEmail,
       giftMessage: giftMessage || "",
