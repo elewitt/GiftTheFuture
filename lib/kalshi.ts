@@ -146,8 +146,9 @@ export async function getEvents(options: {
  * Search markets by title/ticker
  * Uses multiple strategies:
  * 1. Direct market ticker lookup
- * 2. Event search (for multi-market events like tournaments)
- * 3. Text search across all markets
+ * 2. Series search (for sports leagues, tournaments, etc.)
+ * 3. Event search (for multi-market events like tournaments)
+ * 4. Text search across all markets
  */
 export async function searchMarkets(query: string): Promise<KalshiMarket[]> {
   const q = query.toLowerCase().trim();
@@ -163,14 +164,34 @@ export async function searchMarkets(query: string): Promise<KalshiMarket[]> {
     }
   }
 
-  // Strategy 2: Search events (great for tournaments, elections, etc.)
+  // Strategy 2: Search series (great for sports leagues, tournaments)
+  try {
+    const seriesResults = await searchSeries(q);
+    for (const series of seriesResults.slice(0, 5)) { // Limit to top 5 matching series
+      const seriesEvents = await getSeriesEvents(series.ticker);
+      for (const event of seriesEvents) {
+        if (event.markets) {
+          for (const market of event.markets) {
+            if (!seenTickers.has(market.ticker)) {
+              market.category = series.category || event.category;
+              results.push(market);
+              seenTickers.add(market.ticker);
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("[Kalshi] Series search failed:", e);
+  }
+
+  // Strategy 3: Search events (for multi-market events)
   try {
     const events = await searchEvents(q);
     for (const event of events) {
       if (event.markets) {
         for (const market of event.markets) {
           if (!seenTickers.has(market.ticker)) {
-            // Add category from event
             market.category = event.category;
             results.push(market);
             seenTickers.add(market.ticker);
@@ -182,8 +203,8 @@ export async function searchMarkets(query: string): Promise<KalshiMarket[]> {
     console.error("[Kalshi] Event search failed:", e);
   }
 
-  // Strategy 3: Text search across markets
-  const allMarkets = await fetchAllOpenMarkets(1000); // Increased from 500
+  // Strategy 4: Text search across markets
+  const allMarkets = await fetchAllOpenMarkets(1000);
 
   // Split query into words for better matching
   const queryWords = q.split(/\s+/).filter(w => w.length > 2);
@@ -216,6 +237,56 @@ export async function searchMarkets(query: string): Promise<KalshiMarket[]> {
     // Then by volume
     return (b.volume_24h || 0) - (a.volume_24h || 0);
   });
+}
+
+interface KalshiSeries {
+  ticker: string;
+  title: string;
+  category?: string;
+  tags?: string[];
+}
+
+/**
+ * Search series by query (for sports leagues, tournaments, etc.)
+ */
+async function searchSeries(query: string): Promise<KalshiSeries[]> {
+  const res = await fetch(`${KALSHI_API}/series`, {
+    headers: { "Accept": "application/json" },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Kalshi series API error: ${res.status}`);
+  }
+
+  const data = await res.json();
+  const allSeries: KalshiSeries[] = data.series || [];
+
+  const q = query.toLowerCase();
+  const queryWords = q.split(/\s+/).filter(w => w.length > 2);
+
+  return allSeries.filter(s => {
+    const searchText = `${s.title || ""} ${s.ticker || ""} ${(s.tags || []).join(" ")}`.toLowerCase();
+    const fullMatch = searchText.includes(q);
+    const wordMatch = queryWords.length > 0 && queryWords.every(word => searchText.includes(word));
+    return fullMatch || wordMatch;
+  });
+}
+
+/**
+ * Get events for a specific series
+ */
+async function getSeriesEvents(seriesTicker: string): Promise<KalshiEvent[]> {
+  const res = await fetch(
+    `${KALSHI_API}/events?series_ticker=${encodeURIComponent(seriesTicker)}&limit=50&with_nested_markets=true&status=open`,
+    { headers: { "Accept": "application/json" } }
+  );
+
+  if (!res.ok) {
+    return [];
+  }
+
+  const data = await res.json();
+  return data.events || [];
 }
 
 /**
