@@ -78,7 +78,7 @@ export function getServerKeypair(): Keypair {
 
 /**
  * Sign a base64-encoded transaction from DFlow and submit it.
- * Handles both legacy and versioned transaction formats.
+ * DFlow returns versioned transactions, so we try that first.
  */
 export async function signAndSendDFlowTransaction(
   base64Transaction: string
@@ -89,32 +89,27 @@ export async function signAndSendDFlowTransaction(
   const txBytes = new Uint8Array(txBuffer);
 
   console.log("[Solana] Transaction buffer length:", txBuffer.length);
-  console.log("[Solana] First byte:", txBytes[0], "(0 = versioned, other = legacy)");
 
-  // Check first byte: 0 indicates versioned transaction
-  const isVersioned = txBytes[0] === 0 || txBytes[0] === 128; // 0x00 or 0x80
+  // Try versioned transaction first (DFlow always returns versioned)
+  console.log("[Solana] Deserializing as VersionedTransaction...");
+  try {
+    const vtx = VersionedTransaction.deserialize(txBytes);
+    console.log("[Solana] Versioned transaction deserialized successfully");
+    console.log("[Solana] Signing with server keypair...");
+    vtx.sign([keypair]);
 
-  if (isVersioned) {
-    console.log("[Solana] Deserializing as VersionedTransaction...");
-    try {
-      const vtx = VersionedTransaction.deserialize(txBytes);
-      console.log("[Solana] Versioned transaction deserialized, signing...");
-      vtx.sign([keypair]);
+    console.log("[Solana] Sending versioned transaction...");
+    const signature = await connection.sendRawTransaction(vtx.serialize(), {
+      skipPreflight: false,
+      maxRetries: 3,
+    });
 
-      console.log("[Solana] Sending versioned transaction...");
-      const signature = await connection.sendRawTransaction(vtx.serialize(), {
-        skipPreflight: false,
-        maxRetries: 3,
-      });
+    console.log("[Solana] ✅ Transaction sent:", signature);
+    return signature;
+  } catch (versionedErr: any) {
+    console.log("[Solana] Versioned failed, trying legacy...", versionedErr.message);
 
-      console.log("[Solana] Transaction sent:", signature);
-      return signature;
-    } catch (err: any) {
-      console.error("[Solana] Versioned transaction failed:", err.message);
-      throw err;
-    }
-  } else {
-    console.log("[Solana] Deserializing as legacy Transaction...");
+    // Fallback to legacy transaction
     try {
       const tx = Transaction.from(txBuffer);
       tx.sign(keypair);
@@ -124,11 +119,13 @@ export async function signAndSendDFlowTransaction(
         maxRetries: 3,
       });
 
-      console.log("[Solana] Legacy transaction sent:", signature);
+      console.log("[Solana] ✅ Legacy transaction sent:", signature);
       return signature;
-    } catch (err: any) {
-      console.error("[Solana] Legacy transaction failed:", err.message);
-      throw err;
+    } catch (legacyErr: any) {
+      console.error("[Solana] Both versioned and legacy failed");
+      console.error("[Solana] Versioned error:", versionedErr.message);
+      console.error("[Solana] Legacy error:", legacyErr.message);
+      throw versionedErr; // Throw the original error
     }
   }
 }
