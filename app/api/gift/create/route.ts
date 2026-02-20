@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createOrder, getOutcomeMints, USDC_MINT, getOrderStatus } from "@/lib/dflow";
+import { createOrder, getOutcomeMints, USDC_MINT } from "@/lib/dflow";
 import {
   signAndSendDFlowTransaction,
   confirmTransaction,
@@ -94,36 +94,17 @@ export async function POST(req: Request) {
 
     await updateGift(gift.id, { purchaseTxSig: signature });
 
-    // 5. Wait for fill
-    let filled = false;
-
-    if (orderResponse.executionMode === "sync") {
+    // 5. Wait for on-chain confirmation
+    console.log("[Gift Create] Confirming transaction:", signature);
+    try {
       await confirmTransaction(signature);
-      filled = true;
-    } else {
-      // Async: poll DFlow for fill status
-      for (let i = 0; i < 30; i++) {
-        await new Promise((r) => setTimeout(r, 2000));
-        try {
-          const status = await getOrderStatus(signature);
-          if (status.status === "filled") {
-            filled = true;
-            break;
-          }
-          if (status.status === "failed") {
-            throw new Error("DFlow order fill failed");
-          }
-        } catch {
-          // Keep polling
-        }
-      }
-    }
-
-    if (!filled) {
+      console.log("[Gift Create] Transaction confirmed on-chain");
+    } catch (confirmErr) {
+      console.error("[Gift Create] Transaction failed:", confirmErr);
       await updateGift(gift.id, { status: "expired" });
       return NextResponse.json(
-        { error: "Order not confirmed in time" },
-        { status: 504 }
+        { error: "Transaction failed on-chain" },
+        { status: 500 }
       );
     }
 
