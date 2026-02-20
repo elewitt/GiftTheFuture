@@ -144,21 +144,99 @@ export async function getEvents(options: {
 
 /**
  * Search markets by title/ticker
+ * Uses multiple strategies:
+ * 1. Direct market ticker lookup
+ * 2. Event search (for multi-market events like tournaments)
+ * 3. Text search across all markets
  */
 export async function searchMarkets(query: string): Promise<KalshiMarket[]> {
-  // Fetch more markets to search through
-  const allMarkets = await fetchAllOpenMarkets(500);
-  
+  const q = query.toLowerCase().trim();
+  const results: KalshiMarket[] = [];
+  const seenTickers = new Set<string>();
+
+  // Strategy 1: Try direct market lookup if query looks like a ticker
+  if (q.includes("-") || /^[a-z0-9]+$/i.test(q)) {
+    const directMarket = await getMarket(q.toUpperCase());
+    if (directMarket && !seenTickers.has(directMarket.ticker)) {
+      results.push(directMarket);
+      seenTickers.add(directMarket.ticker);
+    }
+  }
+
+  // Strategy 2: Search events (great for tournaments, elections, etc.)
+  try {
+    const events = await searchEvents(q);
+    for (const event of events) {
+      if (event.markets) {
+        for (const market of event.markets) {
+          if (!seenTickers.has(market.ticker)) {
+            // Add category from event
+            market.category = event.category;
+            results.push(market);
+            seenTickers.add(market.ticker);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("[Kalshi] Event search failed:", e);
+  }
+
+  // Strategy 3: Text search across markets
+  const allMarkets = await fetchAllOpenMarkets(1000); // Increased from 500
+
+  // Split query into words for better matching
+  const queryWords = q.split(/\s+/).filter(w => w.length > 2);
+
+  for (const m of allMarkets) {
+    if (seenTickers.has(m.ticker)) continue;
+
+    const searchText = `${m.title || ""} ${m.subtitle || ""} ${m.ticker || ""} ${m.event_ticker || ""}`.toLowerCase();
+
+    // Match if query is found OR all query words are found
+    const fullMatch = searchText.includes(q);
+    const wordMatch = queryWords.length > 0 && queryWords.every(word => searchText.includes(word));
+
+    if (fullMatch || wordMatch) {
+      results.push(m);
+      seenTickers.add(m.ticker);
+    }
+  }
+
+  // Sort by relevance (exact title match first) then by volume
+  return results.sort((a, b) => {
+    const aTitle = (a.title || "").toLowerCase();
+    const bTitle = (b.title || "").toLowerCase();
+
+    // Exact title match gets priority
+    const aExact = aTitle.includes(q) ? 1 : 0;
+    const bExact = bTitle.includes(q) ? 1 : 0;
+    if (aExact !== bExact) return bExact - aExact;
+
+    // Then by volume
+    return (b.volume_24h || 0) - (a.volume_24h || 0);
+  });
+}
+
+/**
+ * Search events by query
+ */
+async function searchEvents(query: string): Promise<KalshiEvent[]> {
+  const events = await getEvents({ limit: 200, withNestedMarkets: true });
   const q = query.toLowerCase();
-  
-  return allMarkets
-    .filter(
-      (m) =>
-        m.title?.toLowerCase().includes(q) ||
-        m.ticker?.toLowerCase().includes(q) ||
-        m.subtitle?.toLowerCase().includes(q)
-    )
-    .sort((a, b) => (b.volume_24h || 0) - (a.volume_24h || 0));
+
+  // Split query into words for better matching
+  const queryWords = q.split(/\s+/).filter(w => w.length > 2);
+
+  return events.filter(e => {
+    const searchText = `${e.title || ""} ${e.subtitle || ""} ${e.event_ticker || ""} ${e.category || ""}`.toLowerCase();
+
+    // Check for full query match or all words match
+    const fullMatch = searchText.includes(q);
+    const wordMatch = queryWords.length > 0 && queryWords.every(word => searchText.includes(word));
+
+    return fullMatch || wordMatch;
+  });
 }
 
 /**
@@ -275,9 +353,12 @@ function extractCategory(ticker: string): string {
   const t = ticker.toUpperCase();
   
   // Check for known category patterns
-  if (t.includes("NFL") || t.includes("NBA") || t.includes("MLB") || 
+  if (t.includes("NFL") || t.includes("NBA") || t.includes("MLB") ||
       t.includes("NHL") || t.includes("MMA") || t.includes("SOCCER") ||
-      t.includes("SPORTS") || t.includes("SB-") || t.includes("SUPERBOWL")) {
+      t.includes("SPORTS") || t.includes("SB-") || t.includes("SUPERBOWL") ||
+      t.includes("PGA") || t.includes("GOLF") || t.includes("MASTERS") ||
+      t.includes("UFC") || t.includes("TENNIS") || t.includes("F1") ||
+      t.includes("NASCAR") || t.includes("BOXING")) {
     return "Sports";
   }
   if (t.includes("PRES") || t.includes("ELEC") || t.includes("GOV") || 
