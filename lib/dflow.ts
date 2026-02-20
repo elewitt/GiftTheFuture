@@ -67,11 +67,13 @@ export interface DFlowMarket {
 export interface OrderResponse {
   transaction: string; // Base64-encoded Solana transaction
   executionMode: "sync" | "async";
-  quote: {
-    inputAmount: string;
-    outputAmount: string;
-    price: string;
-  };
+  inputMint: string;
+  outputMint: string;
+  inAmount: string;
+  outAmount: string;
+  minOutAmount: string;
+  slippageBps: number;
+  lastValidBlockHeight: number;
 }
 
 export interface PriceUpdate {

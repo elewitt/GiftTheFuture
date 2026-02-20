@@ -109,11 +109,11 @@ export async function POST(req: Request) {
     }
 
     // 6. Update gift to pending_claim
-    // Parse the output amount from DFlow quote (returned as string)
-    const tokensReceived = Number(orderResponse.quote.outputAmount || "0");
+    // Parse the output amount from DFlow response (outAmount at top level)
+    const tokensReceived = Number(orderResponse.outAmount || "0");
 
     if (tokensReceived <= 0) {
-      console.error("[Gift Create] Invalid token amount from quote:", orderResponse.quote);
+      console.error("[Gift Create] Invalid token amount from response:", orderResponse);
       await updateGift(gift.id, { status: "expired" });
       return NextResponse.json(
         { error: "Trade completed but received zero tokens" },
