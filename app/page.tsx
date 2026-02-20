@@ -3,6 +3,7 @@
 import { usePrivy, useLogin } from "@privy-io/react-auth";
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
+import { MarketSearch } from "@/components/MarketSearch";
 
 interface Market {
   ticker: string;
@@ -26,11 +27,6 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const retryCount = useRef(0);
-  
-  // Search state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Market[] | null>(null);
-  const [searching, setSearching] = useState(false);
 
   // Category filter
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -70,41 +66,11 @@ export default function HomePage() {
     }
   }
 
-  // Debounced search
-  const handleSearch = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults(null);
-      return;
-    }
-
-    setSearching(true);
-    try {
-      const res = await fetch(`/api/markets?q=${encodeURIComponent(query)}&limit=20`);
-      if (!res.ok) throw new Error("Search failed");
-      const data = await res.json();
-      setSearchResults(data.markets);
-    } catch (err) {
-      console.error("Search error:", err);
-    } finally {
-      setSearching(false);
-    }
-  }, []);
-
-  // Debounce search input
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      handleSearch(searchQuery);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, handleSearch]);
-
   // Get unique categories from markets
   const categories = Array.from(new Set(markets.map((m) => m.category))).sort();
 
   // Filter markets by category
-  const displayedMarkets = searchResults !== null
-    ? searchResults
-    : selectedCategory
+  const displayedMarkets = selectedCategory
     ? markets.filter((m) => m.category === selectedCategory)
     : markets;
 
@@ -169,57 +135,18 @@ export default function HomePage() {
         </p>
 
         {/* Search Bar */}
-        <div className="max-w-xl mx-auto relative">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search markets... (e.g., Super Bowl, Bitcoin, Elections)"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-5 py-4 pl-12 rounded-2xl bg-slate-900/80 border border-slate-800 text-slate-200 text-base placeholder:text-slate-600 focus:outline-none focus:border-indigo-500/50 transition"
-            />
-            <svg
-              className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            {searching && (
-              <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                <div className="w-5 h-5 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
-              </div>
-            )}
-          </div>
-          
-          {/* Search results indicator */}
-          {searchQuery && searchResults !== null && (
-            <p className="text-xs text-slate-500 mt-2 text-left px-2">
-              {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} for &quot;{searchQuery}&quot;
-              <button
-                onClick={() => {
-                  setSearchQuery("");
-                  setSearchResults(null);
-                }}
-                className="ml-2 text-indigo-400 hover:text-indigo-300"
-              >
-                Clear
-              </button>
-            </p>
-          )}
+        <div className="max-w-xl mx-auto">
+          <MarketSearch
+            placeholder="Search any Kalshi market... (e.g., Super Bowl, Bitcoin, Elections)"
+            showTrending={true}
+          />
         </div>
       </div>
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-5 pb-20">
         {/* Category Pills */}
-        {!searchQuery && categories.length > 0 && (
+        {categories.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-6">
             <button
               onClick={() => setSelectedCategory(null)}
@@ -250,21 +177,17 @@ export default function HomePage() {
         {/* Section Header */}
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold text-slate-400">
-            {searchQuery
-              ? "Search Results"
-              : selectedCategory
+            {selectedCategory
               ? `${selectedCategory} Markets`
               : "Trending Markets"}
           </h3>
-          {!searchQuery && (
-            <button
-              onClick={fetchTrendingMarkets}
-              disabled={loading}
-              className="text-xs text-slate-600 hover:text-slate-400 transition"
-            >
-              {loading ? "Loading..." : "Refresh"}
-            </button>
-          )}
+          <button
+            onClick={fetchTrendingMarkets}
+            disabled={loading}
+            className="text-xs text-slate-600 hover:text-slate-400 transition"
+          >
+            {loading ? "Loading..." : "Refresh"}
+          </button>
         </div>
 
         {/* Markets Grid */}
@@ -288,22 +211,19 @@ export default function HomePage() {
           <div className="text-center py-20">
             <p className="text-4xl mb-4">🔍</p>
             <p className="text-slate-400 text-sm">No markets found</p>
-            {searchQuery && (
+            {selectedCategory && (
               <button
-                onClick={() => {
-                  setSearchQuery("");
-                  setSearchResults(null);
-                }}
+                onClick={() => setSelectedCategory(null)}
                 className="mt-4 text-indigo-400 text-sm hover:text-indigo-300"
               >
-                Clear search
+                Show all markets
               </button>
             )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {displayedMarkets.map((market, idx) => (
-              <MarketCard key={market.ticker} market={market} rank={idx + 1} showRank={!searchQuery && !selectedCategory} />
+              <MarketCard key={market.ticker} market={market} rank={idx + 1} showRank={!selectedCategory} />
             ))}
           </div>
         )}

@@ -27,8 +27,12 @@ export async function POST(req: Request) {
       });
     }
 
+    // Use verified domain in production, fall back to Resend test domain
+    // Note: Test domain (onboarding@resend.dev) only delivers to your Resend account email
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "Gift the Future <onboarding@resend.dev>";
+
     const { data, error } = await resend.emails.send({
-      from: "Gift the Future <onboarding@resend.dev>", // Using Resend's test domain until you verify your own
+      from: fromEmail,
       to: [to],
       subject: `${senderName || "Someone"} sent you a prediction market position!`,
       html: `
@@ -117,9 +121,15 @@ export async function POST(req: Request) {
 
     if (error) {
       console.error("[Email] Resend error:", error);
+      // Provide helpful message for test domain restriction
+      if (error.message?.includes("not allowed") || error.message?.includes("verify")) {
+        console.error("[Email] Note: Test domain (onboarding@resend.dev) can only send to your Resend account email.");
+        console.error("[Email] To send to other addresses, verify a custom domain at https://resend.com/domains");
+      }
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    console.log("[Email] Sent successfully to:", to, "id:", data?.id);
     return NextResponse.json({ success: true, emailId: data?.id });
   } catch (error: any) {
     console.error("[/api/email/send] Error:", error);

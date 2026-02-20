@@ -1,8 +1,8 @@
 "use client";
 
 import { usePrivy, useLogin } from "@privy-io/react-auth";
-import { useSolanaWallets } from "@privy-io/react-auth/solana";
-import { useEffect, useState } from "react";
+import { useSolanaWallets, useCreateWallet } from "@privy-io/react-auth/solana";
+import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -36,15 +36,20 @@ export default function GiftClaimPage() {
 
   const { ready, authenticated, user } = usePrivy();
   const { wallets } = useSolanaWallets();
+  const { createWallet } = useCreateWallet();
 
   const [gift, setGift] = useState<GiftData | null>(null);
   const [step, setStep] = useState<ClaimStep>("loading");
   const [claimTx, setClaimTx] = useState<string | null>(null);
   const [confetti, setConfetti] = useState(false);
+  const [walletError, setWalletError] = useState<string | null>(null);
+  const walletRetryCount = useRef(0);
 
   const { login } = useLogin({
     onComplete: async () => {
       // After login completes, useEffect will trigger claim
+      // Reset retry count for new login
+      walletRetryCount.current = 0;
     },
   });
 
@@ -71,36 +76,81 @@ export default function GiftClaimPage() {
 
   // Auto-claim when authenticated + wallet ready
   useEffect(() => {
-    if (!authenticated || !gift) return;
+    if (!authenticated || !gift || !ready) return;
     if (gift.status !== "pending_claim") return;
     if (step === "claiming" || step === "claimed" || step === "error") return;
 
-    // Find the embedded Solana wallet from useSolanaWallets hook
-    const embedded = wallets.find((w) => w.walletClientType === "privy");
-    
-    // Also check user.linkedAccounts for wallet address
-    const linkedWallet = user?.linkedAccounts?.find(
-      (account: any) => 
-        account.type === "wallet" && "address" in account
-    );
+    // Try multiple ways to find the Solana wallet address
+    let walletAddress: string | undefined;
 
-    const walletAddress = embedded?.address || (linkedWallet as any)?.address;
-    
-    if (walletAddress) {
-      console.log("[Claim] Found wallet, claiming:", walletAddress);
-      claimGift(walletAddress);
-    } else {
-      console.log("[Claim] Waiting for wallet...", {
-        walletsCount: wallets.length,
-        linkedAccounts: user?.linkedAccounts?.length,
-        authenticated,
-      });
-      // Keep showing "Setting up wallet..."
-      if (step !== "opened" && step !== "signing_in") {
-        setStep("opened");
+    // Method 1: Check useSolanaWallets hook - look for embedded wallet
+    const embeddedWallet = wallets.find((w) => w.walletClientType === "privy");
+    if (embeddedWallet?.address) {
+      walletAddress = embeddedWallet.address;
+      console.log("[Claim] Found embedded wallet:", walletAddress);
+    }
+
+    // Method 2: Check any Solana wallet from the hook
+    if (!walletAddress && wallets.length > 0) {
+      walletAddress = wallets[0].address;
+      console.log("[Claim] Using first Solana wallet:", walletAddress);
+    }
+
+    // Method 3: Check user.linkedAccounts for Solana wallet
+    if (!walletAddress && user?.linkedAccounts) {
+      const solanaWallet = user.linkedAccounts.find(
+        (account: any) =>
+          account.type === "wallet" &&
+          account.chainType === "solana" &&
+          "address" in account
+      );
+      if (solanaWallet && "address" in solanaWallet) {
+        walletAddress = (solanaWallet as any).address;
+        console.log("[Claim] Found Solana wallet in linkedAccounts:", walletAddress);
       }
     }
-  }, [authenticated, wallets, user, gift, step]);
+
+    // Method 4: Check user.wallet (primary wallet)
+    if (!walletAddress && user?.wallet?.address) {
+      walletAddress = user.wallet.address;
+      console.log("[Claim] Using user.wallet:", walletAddress);
+    }
+
+    if (walletAddress) {
+      claimGift(walletAddress);
+    } else {
+      console.log("[Claim] Wallet not found, attempt:", walletRetryCount.current, {
+        walletsCount: wallets.length,
+        walletTypes: wallets.map(w => w.walletClientType),
+        linkedAccountsCount: user?.linkedAccounts?.length,
+        linkedAccountTypes: user?.linkedAccounts?.map((a: any) => `${a.type}:${a.chainType || 'unknown'}`),
+        userWallet: user?.wallet,
+        authenticated,
+        ready,
+      });
+
+      // Try to create wallet if not found after a few retries
+      if (walletRetryCount.current >= 3) {
+        console.log("[Claim] Attempting to create Solana wallet...");
+        createWallet()
+          .then(({ wallet }) => {
+            console.log("[Claim] Created wallet:", wallet.address);
+            claimGift(wallet.address);
+          })
+          .catch((err) => {
+            console.error("[Claim] Failed to create wallet:", err);
+            setWalletError(err.message || "Failed to create wallet");
+            setStep("error");
+          });
+      } else {
+        walletRetryCount.current += 1;
+        // Keep showing "Setting up wallet..."
+        if (step !== "opened" && step !== "signing_in") {
+          setStep("opened");
+        }
+      }
+    }
+  }, [authenticated, wallets, user, gift, step, ready, createWallet]);
 
   async function claimGift(walletAddress: string) {
     setStep("claiming");
@@ -559,14 +609,32 @@ export default function GiftClaimPage() {
             <span className="text-4xl">😕</span>
           </div>
           <h1 className="text-xl font-bold mb-2 text-slate-200">Something went wrong</h1>
-          <p className="text-sm text-slate-500 mb-6">
+          <p className="text-sm text-slate-500 mb-4">
             We couldn&apos;t claim your gift. Please try again.
           </p>
+          {walletError && (
+            <p className="text-xs text-red-400 bg-red-500/10 rounded-lg p-3 mb-4 font-mono">
+              {walletError}
+            </p>
+          )}
           <button
             onClick={() => {
-              const embedded = wallets.find((w) => w.walletClientType === "privy");
-              if (embedded) {
-                claimGift(embedded.address);
+              setWalletError(null);
+              walletRetryCount.current = 0;
+              // Try to find any wallet and claim
+              const walletAddress =
+                wallets.find((w) => w.walletClientType === "privy")?.address ||
+                wallets[0]?.address;
+              if (walletAddress) {
+                claimGift(walletAddress);
+              } else {
+                // Try creating a wallet
+                createWallet()
+                  .then(({ wallet }) => claimGift(wallet.address))
+                  .catch((err) => {
+                    setWalletError(err.message);
+                    setStep("error");
+                  });
               }
             }}
             className="px-6 py-3 rounded-xl bg-indigo-500 text-white font-medium hover:bg-indigo-400 transition"

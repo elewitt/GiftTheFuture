@@ -1,389 +1,823 @@
 "use client";
 
 import { usePrivy, useLogin } from "@privy-io/react-auth";
-import { useSolanaWallets } from "@privy-io/react-auth";
+import { useSolanaWallets } from "@privy-io/react-auth/solana";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { WalletBalance } from "@/components/WalletBalance";
+import { VersionedTransaction } from "@solana/web3.js";
 
 interface Position {
-  mint: string;
-  balance: number;
-  market: {
-    ticker: string;
-    title: string;
-    status: string;
-  } | null;
-  side: "YES" | "NO" | "UNKNOWN";
-  currentPrice?: number;
-  currentValue?: number;
+  id: string;
+  marketTicker: string;
+  marketTitle: string;
+  side: "yes" | "no";
+  shares: number;
+  costBasis: number;
+  currentPrice: number;
+  currentValue: number;
+  potentialPayout: number;
+  profitLoss: number;
+  marketStatus: string;
+  claimedAt: string;
+  outcomeMint: string;
+}
+
+interface SentGift {
+  id: string;
+  marketTicker: string;
+  marketTitle: string;
+  side: string;
+  shares: number;
+  costUSDC: number;
+  recipientName: string;
+  recipientContact: string;
+  status: string;
+  currentPrice: number;
+  createdAt: string;
+  claimedAt: string | null;
+}
+
+interface PendingGift {
+  id: string;
+  marketTicker: string;
+  marketTitle: string;
+  side: string;
+  shares: number;
+  currentPrice: number;
+  currentValue: number;
+  potentialPayout: number;
+  giftMessage: string;
+  createdAt: string;
+}
+
+interface DashboardData {
+  positions: Position[];
+  sent: SentGift[];
+  pending: PendingGift[];
+  summary: {
+    positionCount: number;
+    totalValue: number;
+    totalPotential: number;
+    totalCostBasis: number;
+    totalProfitLoss: number;
+    sentCount: number;
+    pendingCount: number;
+  };
+}
+
+type Tab = "positions" | "sent" | "pending";
+
+type CashoutStep = "confirm" | "signing" | "sending" | "confirming" | "done" | "error";
+
+interface CashoutState {
+  position: Position | null;
+  step: CashoutStep;
+  error: string | null;
+  signature: string | null;
+  usdcReceived: number | null;
 }
 
 export default function DashboardPage() {
   const { ready, authenticated, user, logout } = usePrivy();
   const { login } = useLogin();
   const { wallets } = useSolanaWallets();
-  
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [positions, setPositions] = useState<Position[]>([]);
-  const [loadingPositions, setLoadingPositions] = useState(false);
-  const [usdcBalance, setUsdcBalance] = useState<number>(0);
-  
-  // Cash out modal state
-  const [cashingOut, setCashingOut] = useState<Position | null>(null);
-  const [cashOutStep, setCashOutStep] = useState<"confirm" | "processing" | "done" | "error">("confirm");
-  const [cashOutResult, setCashOutResult] = useState<{ signature: string; received: number } | null>(null);
+
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<Tab>("positions");
+
+  // Cashout modal state
+  const [cashout, setCashout] = useState<CashoutState>({
+    position: null,
+    step: "confirm",
+    error: null,
+    signature: null,
+    usdcReceived: null,
+  });
 
   useEffect(() => {
-    const embedded = wallets.find((w) => w.walletClientType === "privy");
-    if (embedded) {
-      setWalletAddress(embedded.address);
-    }
-  }, [wallets]);
+    if (!authenticated || !user) return;
 
-  const fetchPositions = useCallback(async () => {
-    if (!walletAddress) return;
-    
-    setLoadingPositions(true);
-    try {
-      const res = await fetch(`/api/wallet/positions?address=${walletAddress}`);
-      if (res.ok) {
-        const data = await res.json();
-        setPositions(data.positions || []);
+    async function fetchDashboard() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const email = user?.email?.address || "";
+        const res = await fetch(
+          `/api/user/dashboard?privyId=${user?.id}&email=${encodeURIComponent(email)}`
+        );
+
+        if (!res.ok) throw new Error("Failed to fetch dashboard");
+
+        const dashboardData = await res.json();
+        setData(dashboardData);
+
+        // Auto-switch to pending tab if there are pending gifts
+        if (dashboardData.pending?.length > 0 && dashboardData.positions?.length === 0) {
+          setActiveTab("pending");
+        }
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error("Error fetching positions:", err);
-    } finally {
-      setLoadingPositions(false);
     }
-  }, [walletAddress]);
 
-  useEffect(() => {
-    if (walletAddress) {
-      fetchPositions();
+    fetchDashboard();
+  }, [authenticated, user]);
+
+  // Cashout handler
+  const handleCashout = useCallback(async () => {
+    const position = cashout.position;
+    if (!position) return;
+
+    // Find the embedded Solana wallet
+    const wallet = wallets.find((w) => w.walletClientType === "privy") || wallets[0];
+    if (!wallet) {
+      setCashout((prev) => ({ ...prev, step: "error", error: "No wallet found" }));
+      return;
     }
-  }, [walletAddress, fetchPositions]);
 
-  async function handleCashOut(position: Position) {
-    if (!walletAddress || !position.market) return;
-    
-    setCashOutStep("processing");
-    
     try {
-      // Get the redemption transaction from DFlow
-      const res = await fetch("/api/gift/redeem", {
+      // Step 1: Get the unsigned transaction from DFlow
+      setCashout((prev) => ({ ...prev, step: "signing" }));
+
+      const redeemRes = await fetch("/api/gift/redeem", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          outcomeMint: position.mint,
-          amount: Math.floor(position.balance * 1e6), // Convert to smallest unit
-          userPublicKey: walletAddress,
+          outcomeMint: position.outcomeMint,
+          amount: Math.floor(position.shares * 1_000_000), // Convert to raw amount
+          userPublicKey: wallet.address,
         }),
       });
 
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to create redemption order");
+      if (!redeemRes.ok) {
+        const errData = await redeemRes.json();
+        throw new Error(errData.error || "Failed to create sell order");
       }
 
-      // For demo purposes, simulate success
-      // In production, you'd sign and send the transaction via Privy
-      setCashOutResult({
-        signature: "demo-signature-" + Date.now(),
-        received: position.balance * (position.currentPrice || 0.5),
+      const { transaction: base64Tx, outAmount } = await redeemRes.json();
+
+      // Step 2: Deserialize and sign the transaction
+      const txBuffer = Buffer.from(base64Tx, "base64");
+      const transaction = VersionedTransaction.deserialize(new Uint8Array(txBuffer));
+
+      setCashout((prev) => ({ ...prev, step: "sending" }));
+
+      // Sign and send using Privy wallet
+      const signedTx = await wallet.signTransaction(transaction);
+
+      // Send the transaction
+      const connection = new (await import("@solana/web3.js")).Connection(
+        "https://api.mainnet-beta.solana.com",
+        "confirmed"
+      );
+
+      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: false,
+        maxRetries: 3,
       });
-      setCashOutStep("done");
-      
-      // Refresh positions
-      setTimeout(fetchPositions, 3000);
+
+      setCashout((prev) => ({
+        ...prev,
+        step: "confirming",
+        signature,
+      }));
+
+      // Step 3: Wait for confirmation
+      const latestBlockhash = await connection.getLatestBlockhash();
+      await connection.confirmTransaction({
+        signature,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      });
+
+      // Step 4: Update gift status in database
+      const usdcReceived = Number(outAmount) / 1_000_000;
+
+      await fetch("/api/gift/cashout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          giftId: position.id,
+          signature,
+          usdcReceived,
+        }),
+      });
+
+      setCashout((prev) => ({
+        ...prev,
+        step: "done",
+        usdcReceived,
+      }));
+
+      // Refresh dashboard after a short delay
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
     } catch (err: any) {
-      console.error("Cash out error:", err);
-      setCashOutStep("error");
+      console.error("Cashout error:", err);
+      setCashout((prev) => ({
+        ...prev,
+        step: "error",
+        error: err.message || "Cashout failed",
+      }));
     }
-  }
+  }, [cashout.position, wallets]);
+
+  const openCashoutModal = (position: Position) => {
+    setCashout({
+      position,
+      step: "confirm",
+      error: null,
+      signature: null,
+      usdcReceived: null,
+    });
+  };
+
+  const closeCashoutModal = () => {
+    setCashout({
+      position: null,
+      step: "confirm",
+      error: null,
+      signature: null,
+      usdcReceived: null,
+    });
+  };
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-950 to-slate-900">
+        <div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
       </div>
     );
   }
 
   if (!authenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-5">
+      <div className="min-h-screen flex items-center justify-center px-5 bg-gradient-to-b from-slate-950 to-slate-900">
         <div className="text-center max-w-sm">
-          <p className="text-4xl mb-4">🔐</p>
-          <h1 className="text-xl font-bold mb-3">Sign in to view your dashboard</h1>
-          <p className="text-sm text-slate-500 mb-6">
-            See your prediction market positions and cash out anytime.
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-violet-500/20 flex items-center justify-center mx-auto mb-6">
+            <span className="text-4xl">📊</span>
+          </div>
+          <h1 className="text-2xl font-bold mb-3 text-slate-100">Your Dashboard</h1>
+          <p className="text-sm text-slate-500 mb-8">
+            Sign in to see your prediction market positions, track your gifts, and cash out anytime.
           </p>
           <button
             onClick={login}
-            className="px-8 py-3 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white font-bold"
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white font-bold text-base hover:opacity-90 transition"
           >
-            Sign In
+            Sign In to Continue
           </button>
         </div>
       </div>
     );
   }
 
-  const totalValue = positions.reduce((sum, p) => sum + (p.currentValue || p.balance * 0.5), 0);
-
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900">
       {/* Header */}
-      <header className="max-w-4xl mx-auto px-5 py-5 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-500 flex items-center justify-center text-lg">
-            🎁
+      <header className="border-b border-slate-800/50">
+        <div className="max-w-5xl mx-auto px-5 py-4 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-500 flex items-center justify-center text-lg">
+              🎁
+            </div>
+            <span className="text-lg font-bold text-slate-100">Gift the Future</span>
+          </Link>
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-slate-500 hidden sm:block">
+              {user?.email?.address || "Connected"}
+            </span>
+            <button
+              onClick={logout}
+              className="text-xs text-slate-500 hover:text-slate-300 transition px-3 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700"
+            >
+              Sign Out
+            </button>
           </div>
-          <span className="text-lg font-bold text-slate-100">Gift the Future</span>
-        </Link>
-        <button
-          onClick={logout}
-          className="text-xs text-slate-500 hover:text-slate-300 transition px-3 py-1.5 rounded-lg border border-slate-800"
-        >
-          Sign Out
-        </button>
+        </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-5 pb-20">
-        {/* Welcome */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold mb-1">Your Dashboard</h1>
-          <p className="text-sm text-slate-500">
-            Manage your prediction market positions
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: Wallet Section */}
-          <div className="lg:col-span-1 space-y-4">
-            {walletAddress && (
-              <WalletBalance 
-                walletAddress={walletAddress} 
-                onBalanceUpdate={setUsdcBalance}
-              />
-            )}
-
-            {/* Portfolio Summary */}
-            <div className="bg-slate-900/60 border border-slate-800/50 rounded-xl p-4">
-              <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">Portfolio Value</p>
-              <p className="text-3xl font-bold text-slate-100">
-                ${totalValue.toFixed(2)}
-              </p>
-              <p className="text-xs text-slate-600 mt-1">
-                {positions.length} active position{positions.length !== 1 ? "s" : ""}
-              </p>
-            </div>
-
-            {/* Quick Links */}
-            <Link
-              href="/"
-              className="block text-center py-3 rounded-xl border border-slate-800 text-slate-400 text-sm hover:border-slate-700 hover:text-slate-300 transition"
-            >
-              Browse Markets →
-            </Link>
+      <div className="max-w-5xl mx-auto px-5 py-8">
+        {/* Summary Cards */}
+        {data && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <SummaryCard
+              label="Portfolio Value"
+              value={`$${data.summary.totalValue.toFixed(2)}`}
+              subtext={`${data.summary.positionCount} position${data.summary.positionCount !== 1 ? "s" : ""}`}
+              color="indigo"
+            />
+            <SummaryCard
+              label="Potential Payout"
+              value={`$${data.summary.totalPotential.toFixed(2)}`}
+              subtext="If all correct"
+              color="amber"
+            />
+            <SummaryCard
+              label="Total P&L"
+              value={`${data.summary.totalProfitLoss >= 0 ? "+" : ""}$${data.summary.totalProfitLoss.toFixed(2)}`}
+              subtext={`Cost basis: $${data.summary.totalCostBasis.toFixed(2)}`}
+              color={data.summary.totalProfitLoss >= 0 ? "emerald" : "red"}
+            />
+            <SummaryCard
+              label="Gifts Sent"
+              value={data.summary.sentCount.toString()}
+              subtext={data.summary.pendingCount > 0 ? `${data.summary.pendingCount} pending` : "All claimed"}
+              color="violet"
+            />
           </div>
+        )}
 
-          {/* Right: Positions */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Your Positions</h2>
+        {/* Pending Gifts Alert */}
+        {data && data.pending.length > 0 && (
+          <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🎁</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-amber-200">
+                  You have {data.pending.length} gift{data.pending.length > 1 ? "s" : ""} waiting!
+                </p>
+                <p className="text-xs text-amber-200/60">
+                  Click the Pending tab to claim your positions.
+                </p>
+              </div>
               <button
-                onClick={fetchPositions}
-                disabled={loadingPositions}
-                className="text-xs text-slate-500 hover:text-slate-300 transition"
+                onClick={() => setActiveTab("pending")}
+                className="px-4 py-2 rounded-lg bg-amber-500/20 text-amber-200 text-sm font-medium hover:bg-amber-500/30 transition"
               >
-                {loadingPositions ? "Loading..." : "Refresh"}
+                View Gifts
               </button>
             </div>
-
-            {loadingPositions && positions.length === 0 ? (
-              <div className="bg-slate-900/40 border border-slate-800/50 rounded-2xl p-8 text-center">
-                <div className="w-6 h-6 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-sm text-slate-500">Loading your positions...</p>
-              </div>
-            ) : positions.length === 0 ? (
-              <div className="bg-slate-900/40 border border-slate-800/50 rounded-2xl p-8 text-center">
-                <p className="text-4xl mb-4">📭</p>
-                <p className="text-sm text-slate-400 mb-2">No positions yet</p>
-                <p className="text-xs text-slate-600 mb-4">
-                  Claim a gift or purchase a position to get started
-                </p>
-                <Link
-                  href="/"
-                  className="inline-block px-4 py-2 rounded-xl bg-indigo-500 text-white text-sm font-medium hover:bg-indigo-400 transition"
-                >
-                  Browse Markets
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {positions.map((position) => (
-                  <PositionCard
-                    key={position.mint}
-                    position={position}
-                    onCashOut={() => {
-                      setCashingOut(position);
-                      setCashOutStep("confirm");
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Demo positions for testing */}
-            {positions.length === 0 && (
-              <div className="mt-6 p-4 bg-slate-900/20 rounded-xl border border-dashed border-slate-800">
-                <p className="text-xs text-slate-600 text-center">
-                  Positions will appear here when you claim a gifted prediction market token.
-                  The tokens are real SPL tokens on Solana that can be traded via DFlow.
-                </p>
-              </div>
-            )}
           </div>
+        )}
+
+        {/* Tabs */}
+        <div className="flex gap-1 p-1 bg-slate-900/50 rounded-xl mb-6 w-fit">
+          <TabButton
+            active={activeTab === "positions"}
+            onClick={() => setActiveTab("positions")}
+            count={data?.positions.length}
+          >
+            My Positions
+          </TabButton>
+          <TabButton
+            active={activeTab === "sent"}
+            onClick={() => setActiveTab("sent")}
+            count={data?.sent.length}
+          >
+            Sent
+          </TabButton>
+          <TabButton
+            active={activeTab === "pending"}
+            onClick={() => setActiveTab("pending")}
+            count={data?.pending.length}
+            highlight={(data?.pending.length ?? 0) > 0}
+          >
+            Pending
+          </TabButton>
+        </div>
+
+        {/* Content */}
+        {loading ? (
+          <div className="py-20 text-center">
+            <div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-sm text-slate-500">Loading your dashboard...</p>
+          </div>
+        ) : error ? (
+          <div className="py-20 text-center">
+            <p className="text-red-400 mb-2">Failed to load dashboard</p>
+            <p className="text-xs text-slate-600">{error}</p>
+          </div>
+        ) : (
+          <>
+            {activeTab === "positions" && <PositionsTab positions={data?.positions || []} onCashout={openCashoutModal} />}
+            {activeTab === "sent" && <SentTab gifts={data?.sent || []} />}
+            {activeTab === "pending" && <PendingTab gifts={data?.pending || []} />}
+          </>
+        )}
+
+        {/* Quick Action */}
+        <div className="mt-12 text-center">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-800/50 text-slate-300 text-sm font-medium hover:bg-slate-800 transition"
+          >
+            <span>🔍</span>
+            Browse Markets & Send a Gift
+          </Link>
         </div>
       </div>
 
-      {/* Cash Out Modal */}
-      {cashingOut && (
-        <CashOutModal
-          position={cashingOut}
-          step={cashOutStep}
-          result={cashOutResult}
-          onConfirm={() => handleCashOut(cashingOut)}
-          onClose={() => {
-            setCashingOut(null);
-            setCashOutStep("confirm");
-            setCashOutResult(null);
-          }}
+      {/* Cashout Modal */}
+      {cashout.position && (
+        <CashoutModal
+          cashout={cashout}
+          onConfirm={handleCashout}
+          onClose={closeCashoutModal}
         />
       )}
     </div>
   );
 }
 
-function PositionCard({ position, onCashOut }: { position: Position; onCashOut: () => void }) {
-  const currentPrice = position.currentPrice ?? 0.5;
-  const currentValue = position.balance * currentPrice;
-  const potentialPayout = position.balance;
+function SummaryCard({
+  label,
+  value,
+  subtext,
+  color,
+}: {
+  label: string;
+  value: string;
+  subtext: string;
+  color: "indigo" | "amber" | "emerald" | "red" | "violet";
+}) {
+  const colorClasses = {
+    indigo: "from-indigo-500/10 to-indigo-500/5 border-indigo-500/20",
+    amber: "from-amber-500/10 to-amber-500/5 border-amber-500/20",
+    emerald: "from-emerald-500/10 to-emerald-500/5 border-emerald-500/20",
+    red: "from-red-500/10 to-red-500/5 border-red-500/20",
+    violet: "from-violet-500/10 to-violet-500/5 border-violet-500/20",
+  };
+
+  const textColors = {
+    indigo: "text-indigo-400",
+    amber: "text-amber-400",
+    emerald: "text-emerald-400",
+    red: "text-red-400",
+    violet: "text-violet-400",
+  };
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800/50 rounded-2xl p-5">
+    <div className={`p-4 rounded-xl bg-gradient-to-br ${colorClasses[color]} border`}>
+      <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">{label}</p>
+      <p className={`text-xl font-bold ${textColors[color]}`}>{value}</p>
+      <p className="text-[10px] text-slate-600 mt-1">{subtext}</p>
+    </div>
+  );
+}
+
+function TabButton({
+  children,
+  active,
+  onClick,
+  count,
+  highlight,
+}: {
+  children: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+  count?: number;
+  highlight?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${
+        active
+          ? "bg-slate-800 text-white"
+          : "text-slate-500 hover:text-slate-300"
+      }`}
+    >
+      {children}
+      {count !== undefined && count > 0 && (
+        <span
+          className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+            highlight
+              ? "bg-amber-500/20 text-amber-400"
+              : active
+              ? "bg-slate-700 text-slate-300"
+              : "bg-slate-800/50 text-slate-500"
+          }`}
+        >
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function PositionsTab({ positions, onCashout }: { positions: Position[]; onCashout: (position: Position) => void }) {
+  if (positions.length === 0) {
+    return (
+      <div className="py-16 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-slate-800/50 flex items-center justify-center mx-auto mb-4">
+          <span className="text-3xl">📭</span>
+        </div>
+        <h3 className="text-lg font-semibold text-slate-300 mb-2">No positions yet</h3>
+        <p className="text-sm text-slate-600 max-w-sm mx-auto mb-6">
+          When someone sends you a prediction market gift and you claim it, your position will appear here.
+        </p>
+        <Link
+          href="/"
+          className="inline-block px-6 py-3 rounded-xl bg-indigo-500 text-white text-sm font-medium hover:bg-indigo-400 transition"
+        >
+          Browse Markets
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {positions.map((position) => (
+        <PositionCard key={position.id} position={position} onCashout={onCashout} />
+      ))}
+    </div>
+  );
+}
+
+function PositionCard({ position, onCashout }: { position: Position; onCashout: (position: Position) => void }) {
+  const pricePercent = Math.round(position.currentPrice * 100);
+  const isProfit = position.profitLoss >= 0;
+
+  return (
+    <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800/50 hover:border-slate-700/50 transition">
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
-          <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">
-            {position.market?.status || "Active"}
-          </p>
+          <div className="flex items-center gap-2 mb-1">
+            <span
+              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                position.side === "yes"
+                  ? "bg-emerald-500/10 text-emerald-400"
+                  : "bg-red-500/10 text-red-400"
+              }`}
+            >
+              {position.side}
+            </span>
+            <span className="text-[10px] text-slate-600">
+              {position.marketStatus === "open" ? "🟢 Active" : "⚪ " + position.marketStatus}
+            </span>
+          </div>
           <h3 className="text-sm font-semibold text-slate-200 leading-snug">
-            {position.market?.title || "Unknown Market"}
+            {position.marketTitle}
           </h3>
         </div>
-        <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${
-          position.side === "YES" 
-            ? "bg-emerald-500/10 text-emerald-400" 
-            : "bg-red-500/10 text-red-400"
-        }`}>
-          {position.side}
-        </span>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4 mb-4">
-        <div>
-          <p className="text-[10px] text-slate-600 uppercase">Shares</p>
-          <p className="text-sm font-semibold text-slate-200">{position.balance.toFixed(2)}</p>
-        </div>
-        <div>
-          <p className="text-[10px] text-slate-600 uppercase">Current Value</p>
-          <p className="text-sm font-semibold text-slate-200">${currentValue.toFixed(2)}</p>
-        </div>
-        <div>
-          <p className="text-[10px] text-slate-600 uppercase">If Correct</p>
-          <p className="text-sm font-semibold text-amber-400">${potentialPayout.toFixed(2)}</p>
+        <div className="text-right">
+          <p className="text-lg font-bold text-slate-100">${position.currentValue.toFixed(2)}</p>
+          <p className={`text-xs font-medium ${isProfit ? "text-emerald-400" : "text-red-400"}`}>
+            {isProfit ? "+" : ""}${position.profitLoss.toFixed(2)}
+          </p>
         </div>
       </div>
 
-      {/* Price bar */}
+      {/* Price Bar */}
       <div className="mb-4">
-        <div className="h-1.5 bg-red-500/15 rounded-full overflow-hidden">
+        <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full"
-            style={{ width: `${currentPrice * 100}%` }}
+            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all"
+            style={{ width: `${pricePercent}%` }}
           />
         </div>
         <div className="flex justify-between text-[10px] mt-1">
-          <span className="text-emerald-400">{Math.round(currentPrice * 100)}¢</span>
-          <span className="text-red-400">{Math.round((1 - currentPrice) * 100)}¢</span>
+          <span className="text-emerald-400">Yes {pricePercent}¢</span>
+          <span className="text-red-400">No {100 - pricePercent}¢</span>
         </div>
       </div>
 
-      <div className="flex gap-2">
-        <button
-          className="flex-1 py-2 rounded-lg bg-slate-800/50 text-slate-400 text-xs font-medium hover:bg-slate-800 transition"
-        >
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-3">
+        <Stat label="Shares" value={position.shares.toFixed(2)} />
+        <Stat label="Avg Cost" value={`$${(position.costBasis / position.shares).toFixed(2)}`} />
+        <Stat label="Current" value={`${pricePercent}¢`} />
+        <Stat label="If Correct" value={`$${position.potentialPayout.toFixed(2)}`} highlight />
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-2 mt-4 pt-4 border-t border-slate-800/50">
+        <button className="flex-1 py-2.5 rounded-xl bg-slate-800/50 text-slate-400 text-xs font-medium hover:bg-slate-800 transition">
           Hold Position
         </button>
         <button
-          onClick={onCashOut}
-          className="flex-1 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/20 transition"
+          onClick={() => onCashout(position)}
+          className="flex-1 py-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/20 transition"
         >
-          Cash Out · ${currentValue.toFixed(2)}
+          Cash Out · ${position.currentValue.toFixed(2)}
         </button>
       </div>
     </div>
   );
 }
 
-function CashOutModal({
-  position,
-  step,
-  result,
+function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div>
+      <p className="text-[10px] text-slate-600 uppercase">{label}</p>
+      <p className={`text-sm font-semibold ${highlight ? "text-amber-400" : "text-slate-200"}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function SentTab({ gifts }: { gifts: SentGift[] }) {
+  if (gifts.length === 0) {
+    return (
+      <div className="py-16 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-slate-800/50 flex items-center justify-center mx-auto mb-4">
+          <span className="text-3xl">🎁</span>
+        </div>
+        <h3 className="text-lg font-semibold text-slate-300 mb-2">No gifts sent yet</h3>
+        <p className="text-sm text-slate-600 max-w-sm mx-auto mb-6">
+          Send someone a prediction market position as a gift. They'll receive an email with a link to claim it.
+        </p>
+        <Link
+          href="/"
+          className="inline-block px-6 py-3 rounded-xl bg-indigo-500 text-white text-sm font-medium hover:bg-indigo-400 transition"
+        >
+          Send a Gift
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {gifts.map((gift) => (
+        <SentGiftCard key={gift.id} gift={gift} />
+      ))}
+    </div>
+  );
+}
+
+function SentGiftCard({ gift }: { gift: SentGift }) {
+  const statusColors: Record<string, string> = {
+    pending_claim: "bg-amber-500/10 text-amber-400",
+    claimed: "bg-emerald-500/10 text-emerald-400",
+    cashed_out: "bg-blue-500/10 text-blue-400",
+    settled: "bg-slate-500/10 text-slate-400",
+  };
+
+  const statusLabels: Record<string, string> = {
+    pending_claim: "Pending",
+    claimed: "Claimed",
+    cashed_out: "Cashed Out",
+    settled: "Settled",
+  };
+
+  return (
+    <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800/50">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${statusColors[gift.status] || "bg-slate-500/10 text-slate-400"}`}>
+              {statusLabels[gift.status] || gift.status}
+            </span>
+            <span className="text-[10px] text-slate-600">
+              {new Date(gift.createdAt).toLocaleDateString()}
+            </span>
+          </div>
+          <p className="text-sm font-medium text-slate-300 mb-1">{gift.marketTitle}</p>
+          <p className="text-xs text-slate-500">
+            To: {gift.recipientName || gift.recipientContact}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm font-semibold text-slate-200">${gift.costUSDC.toFixed(2)}</p>
+          <p className="text-[10px] text-slate-500">{gift.shares.toFixed(1)} shares</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PendingTab({ gifts }: { gifts: PendingGift[] }) {
+  if (gifts.length === 0) {
+    return (
+      <div className="py-16 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-slate-800/50 flex items-center justify-center mx-auto mb-4">
+          <span className="text-3xl">✅</span>
+        </div>
+        <h3 className="text-lg font-semibold text-slate-300 mb-2">All caught up!</h3>
+        <p className="text-sm text-slate-600 max-w-sm mx-auto">
+          You don't have any pending gifts to claim.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {gifts.map((gift) => (
+        <PendingGiftCard key={gift.id} gift={gift} />
+      ))}
+    </div>
+  );
+}
+
+function PendingGiftCard({ gift }: { gift: PendingGift }) {
+  return (
+    <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-500/5 to-orange-500/5 border border-amber-500/20">
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-lg">🎁</span>
+            <span className="text-[10px] text-amber-400 font-medium uppercase tracking-wider">
+              New Gift!
+            </span>
+          </div>
+          <h3 className="text-sm font-semibold text-slate-200">{gift.marketTitle}</h3>
+          {gift.giftMessage && (
+            <p className="text-xs text-slate-500 mt-1 italic">"{gift.giftMessage}"</p>
+          )}
+        </div>
+        <div className="text-right">
+          <p className="text-lg font-bold text-amber-400">${gift.potentialPayout.toFixed(2)}</p>
+          <p className="text-[10px] text-slate-500">if {gift.side.toUpperCase()} wins</p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/50 mb-4">
+        <div>
+          <p className="text-[10px] text-slate-500">Position</p>
+          <p className="text-sm font-semibold text-slate-200">
+            {gift.shares.toFixed(1)} x{" "}
+            <span className={gift.side === "yes" ? "text-emerald-400" : "text-red-400"}>
+              {gift.side.toUpperCase()}
+            </span>
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] text-slate-500">Current Value</p>
+          <p className="text-sm font-semibold text-slate-200">${gift.currentValue.toFixed(2)}</p>
+        </div>
+      </div>
+
+      <Link
+        href={`/gift/${gift.id}`}
+        className="block w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-bold text-center hover:opacity-90 transition"
+      >
+        Claim This Gift →
+      </Link>
+    </div>
+  );
+}
+
+function CashoutModal({
+  cashout,
   onConfirm,
   onClose,
 }: {
-  position: Position;
-  step: "confirm" | "processing" | "done" | "error";
-  result: { signature: string; received: number } | null;
+  cashout: CashoutState;
   onConfirm: () => void;
   onClose: () => void;
 }) {
-  const currentPrice = position.currentPrice ?? 0.5;
-  const currentValue = position.balance * currentPrice;
+  const position = cashout.position!;
+  const pricePercent = Math.round(position.currentPrice * 100);
 
-  return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-5 z-50">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full">
-        {step === "confirm" && (
+  const stepContent = () => {
+    switch (cashout.step) {
+      case "confirm":
+        return (
           <>
-            <h2 className="text-lg font-bold mb-2">Cash Out Position</h2>
-            <p className="text-sm text-slate-500 mb-6">
-              Sell your shares at the current market price.
-            </p>
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">💰</span>
+              </div>
+              <h3 className="text-xl font-bold text-slate-100 mb-2">Cash Out Position</h3>
+              <p className="text-sm text-slate-500">
+                Sell your shares and receive USDC to your wallet
+              </p>
+            </div>
 
-            <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
-              <div className="flex justify-between py-2 text-sm">
-                <span className="text-slate-500">Selling</span>
-                <span className="text-slate-200">{position.balance.toFixed(2)} shares</span>
+            <div className="p-4 rounded-xl bg-slate-800/50 mb-4">
+              <p className="text-xs text-slate-500 mb-1">Position</p>
+              <p className="text-sm font-medium text-slate-200 mb-3">{position.marketTitle}</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-slate-500">Shares</p>
+                  <p className="text-sm font-semibold text-slate-200">
+                    {position.shares.toFixed(2)} {position.side.toUpperCase()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Current Price</p>
+                  <p className="text-sm font-semibold text-slate-200">{pricePercent}¢</p>
+                </div>
               </div>
-              <div className="flex justify-between py-2 text-sm">
-                <span className="text-slate-500">Market Price</span>
-                <span className="text-slate-200">{Math.round(currentPrice * 100)}¢</span>
+            </div>
+
+            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 mb-6">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-emerald-400">You will receive</span>
+                <span className="text-xl font-bold text-emerald-400">
+                  ~${position.currentValue.toFixed(2)} USDC
+                </span>
               </div>
-              <div className="flex justify-between py-2 text-sm border-t border-slate-700 mt-2 pt-2">
-                <span className="text-slate-300 font-medium">You Receive</span>
-                <span className="text-emerald-400 font-bold">${currentValue.toFixed(2)}</span>
-              </div>
+              <p className="text-[10px] text-emerald-400/60 mt-1">
+                Final amount may vary slightly based on market conditions
+              </p>
             </div>
 
             <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-300 text-sm font-medium hover:bg-slate-700 transition"
+                className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-medium hover:bg-slate-700 transition"
               >
                 Cancel
               </button>
@@ -391,64 +825,121 @@ function CashOutModal({
                 onClick={onConfirm}
                 className="flex-1 py-3 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-400 transition"
               >
-                Confirm
+                Confirm Cash Out
               </button>
             </div>
           </>
-        )}
+        );
 
-        {step === "processing" && (
-          <div className="py-8 text-center">
-            <div className="w-10 h-10 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-sm text-slate-400">Processing your cash out...</p>
-            <p className="text-xs text-slate-600 mt-2">Executing trade via DFlow</p>
+      case "signing":
+        return (
+          <div className="text-center py-8">
+            <div className="w-12 h-12 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-slate-100 mb-2">Preparing Transaction</h3>
+            <p className="text-sm text-slate-500">Creating your sell order...</p>
           </div>
-        )}
+        );
 
-        {step === "done" && result && (
-          <div className="py-4 text-center">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl">✓</span>
+      case "sending":
+        return (
+          <div className="text-center py-8">
+            <div className="w-12 h-12 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-slate-100 mb-2">Sign Transaction</h3>
+            <p className="text-sm text-slate-500">Please approve the transaction in your wallet</p>
+          </div>
+        );
+
+      case "confirming":
+        return (
+          <div className="text-center py-8">
+            <div className="w-12 h-12 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-slate-100 mb-2">Confirming Transaction</h3>
+            <p className="text-sm text-slate-500 mb-4">Waiting for blockchain confirmation...</p>
+            {cashout.signature && (
+              <a
+                href={`https://solscan.io/tx/${cashout.signature}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-indigo-400 hover:text-indigo-300"
+              >
+                View on Solscan →
+              </a>
+            )}
+          </div>
+        );
+
+      case "done":
+        return (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">✅</span>
             </div>
-            <h2 className="text-lg font-bold mb-2">Cashed Out!</h2>
-            <p className="text-2xl font-bold text-emerald-400 mb-4">
-              +${result.received.toFixed(2)}
+            <h3 className="text-xl font-bold text-slate-100 mb-2">Cash Out Complete!</h3>
+            <p className="text-sm text-slate-500 mb-4">
+              You received <span className="text-emerald-400 font-semibold">${cashout.usdcReceived?.toFixed(2)} USDC</span>
             </p>
-            <p className="text-xs text-slate-500 mb-6">
-              USDC added to your wallet
-            </p>
-            <button
-              onClick={onClose}
-              className="w-full py-3 rounded-xl bg-slate-800 text-slate-300 text-sm font-medium hover:bg-slate-700 transition"
-            >
-              Done
-            </button>
+            {cashout.signature && (
+              <a
+                href={`https://solscan.io/tx/${cashout.signature}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block px-4 py-2 rounded-lg bg-slate-800 text-slate-300 text-sm hover:bg-slate-700 transition"
+              >
+                View Transaction →
+              </a>
+            )}
+            <p className="text-xs text-slate-600 mt-4">Refreshing dashboard...</p>
           </div>
-        )}
+        );
 
-        {step === "error" && (
-          <div className="py-4 text-center">
-            <p className="text-4xl mb-4">⚠️</p>
-            <h2 className="text-lg font-bold mb-2">Something went wrong</h2>
-            <p className="text-sm text-slate-500 mb-6">
-              The cash out couldn&apos;t be completed. Please try again.
-            </p>
+      case "error":
+        return (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">❌</span>
+            </div>
+            <h3 className="text-xl font-bold text-slate-100 mb-2">Cash Out Failed</h3>
+            <p className="text-sm text-red-400 mb-6">{cashout.error}</p>
             <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-300 text-sm font-medium"
+                className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-medium hover:bg-slate-700 transition"
               >
                 Close
               </button>
               <button
                 onClick={onConfirm}
-                className="flex-1 py-3 rounded-xl bg-indigo-500 text-white text-sm font-medium"
+                className="flex-1 py-3 rounded-xl bg-indigo-500 text-white text-sm font-bold hover:bg-indigo-400 transition"
               >
-                Retry
+                Try Again
               </button>
             </div>
           </div>
+        );
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={cashout.step === "confirm" || cashout.step === "error" || cashout.step === "done" ? onClose : undefined}
+      />
+
+      {/* Modal */}
+      <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+        {(cashout.step === "confirm" || cashout.step === "error" || cashout.step === "done") && (
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1 text-slate-600 hover:text-slate-400 transition"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         )}
+        {stepContent()}
       </div>
     </div>
   );

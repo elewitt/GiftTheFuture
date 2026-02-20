@@ -22,6 +22,7 @@ import {
   createTransferInstruction,
   getAccount,
   TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import { getMarketByMint } from "./dflow";
@@ -134,8 +135,28 @@ export async function confirmTransaction(
 // ─── SPL Token Transfer (Gift Claiming) ─────────────────────
 
 /**
+ * Detect which token program a mint uses (legacy SPL Token or Token-2022).
+ */
+async function getTokenProgramForMint(
+  connection: Connection,
+  mintPubkey: PublicKey
+): Promise<PublicKey> {
+  const mintInfo = await connection.getAccountInfo(mintPubkey);
+  if (!mintInfo) {
+    throw new Error(`Mint account not found: ${mintPubkey.toBase58()}`);
+  }
+
+  // Check which program owns the mint
+  if (mintInfo.owner.equals(TOKEN_2022_PROGRAM_ID)) {
+    return TOKEN_2022_PROGRAM_ID;
+  }
+  return TOKEN_PROGRAM_ID;
+}
+
+/**
  * Transfer outcome tokens from the server wallet to a recipient.
  * Creates the recipient's Associated Token Account if it doesn't exist.
+ * Supports both legacy SPL Token and Token-2022 programs.
  *
  * This is the core of the "claim gift" flow:
  * Server wallet holds bought tokens → recipient claims → tokens transfer.
@@ -151,12 +172,16 @@ export async function transferOutcomeTokens(params: {
   const mintPubkey = new PublicKey(params.outcomeMint);
   const recipientPubkey = new PublicKey(params.recipientAddress);
 
-  // Derive Associated Token Accounts
+  // Detect which token program this mint uses
+  const tokenProgramId = await getTokenProgramForMint(connection, mintPubkey);
+  console.log("[Transfer] Using token program:", tokenProgramId.toBase58());
+
+  // Derive Associated Token Accounts using the correct program
   const serverATA = getAssociatedTokenAddressSync(
     mintPubkey,
     serverKeypair.publicKey,
     false,
-    TOKEN_PROGRAM_ID,
+    tokenProgramId,
     ASSOCIATED_TOKEN_PROGRAM_ID
   );
 
@@ -164,7 +189,7 @@ export async function transferOutcomeTokens(params: {
     mintPubkey,
     recipientPubkey,
     false,
-    TOKEN_PROGRAM_ID,
+    tokenProgramId,
     ASSOCIATED_TOKEN_PROGRAM_ID
   );
 
@@ -179,7 +204,7 @@ export async function transferOutcomeTokens(params: {
         recipientATA, // ATA address
         recipientPubkey, // owner
         mintPubkey, // token mint
-        TOKEN_PROGRAM_ID,
+        tokenProgramId,
         ASSOCIATED_TOKEN_PROGRAM_ID
       )
     );
@@ -193,7 +218,7 @@ export async function transferOutcomeTokens(params: {
       serverKeypair.publicKey, // authority
       params.amount,
       [],
-      TOKEN_PROGRAM_ID
+      tokenProgramId
     )
   );
 
@@ -218,6 +243,7 @@ export async function transferOutcomeTokens(params: {
 /**
  * Get the token balance for a specific mint in a wallet.
  * Returns the raw amount (smallest unit).
+ * Supports both legacy SPL Token and Token-2022 programs.
  */
 export async function getTokenBalance(
   walletAddress: string,
@@ -227,16 +253,19 @@ export async function getTokenBalance(
   const walletPubkey = new PublicKey(walletAddress);
   const mintPubkey = new PublicKey(mintAddress);
 
+  // Detect which token program this mint uses
+  const tokenProgramId = await getTokenProgramForMint(connection, mintPubkey);
+
   const ata = getAssociatedTokenAddressSync(
     mintPubkey,
     walletPubkey,
     false,
-    TOKEN_PROGRAM_ID,
+    tokenProgramId,
     ASSOCIATED_TOKEN_PROGRAM_ID
   );
 
   try {
-    const account = await getAccount(connection, ata);
+    const account = await getAccount(connection, ata, undefined, tokenProgramId);
     return Number(account.amount);
   } catch {
     // Account doesn't exist or has no balance
@@ -269,8 +298,9 @@ export interface Position {
 /**
  * Get all prediction market positions for a wallet address.
  *
- * Queries all SPL token accounts, then cross-references each mint
- * with DFlow's Metadata API to identify prediction market tokens.
+ * Queries all SPL token accounts (both legacy and Token-2022),
+ * then cross-references each mint with DFlow's Metadata API
+ * to identify prediction market tokens.
  */
 export async function getPositions(
   walletAddress: string
@@ -278,14 +308,19 @@ export async function getPositions(
   const connection = getConnection();
   const pubkey = new PublicKey(walletAddress);
 
-  // Get all token accounts
-  const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-    pubkey,
-    { programId: TOKEN_PROGRAM_ID }
-  );
+  // Get all token accounts from both programs
+  const [legacyAccounts, token2022Accounts] = await Promise.all([
+    connection.getParsedTokenAccountsByOwner(pubkey, {
+      programId: TOKEN_PROGRAM_ID,
+    }),
+    connection.getParsedTokenAccountsByOwner(pubkey, {
+      programId: TOKEN_2022_PROGRAM_ID,
+    }),
+  ]);
 
-  // Filter to non-zero balances
-  const holdings = tokenAccounts.value
+  // Combine and filter to non-zero balances
+  const allAccounts = [...legacyAccounts.value, ...token2022Accounts.value];
+  const holdings = allAccounts
     .map((account) => ({
       mint: account.account.data.parsed.info.mint as string,
       balance: account.account.data.parsed.info.tokenAmount.uiAmount as number,
