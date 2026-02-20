@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createGift, updateGift } from "@/lib/gifts";
-import { createOrder, getOutcomeMints, USDC_MINT, getOrderStatus } from "@/lib/dflow";
+import { createOrder, getOutcomeMints, USDC_MINT } from "@/lib/dflow";
 import { signAndSendDFlowTransaction, confirmTransaction, getServerKeypair } from "@/lib/solana";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
@@ -120,33 +120,17 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
 
       purchaseTxSig = await signAndSendDFlowTransaction(orderResponse.transaction);
 
-      // Wait for fill
-      let filled = false;
-      if (orderResponse.executionMode === "sync") {
+      // Wait for on-chain confirmation
+      try {
         await confirmTransaction(purchaseTxSig);
-        filled = true;
-      } else {
-        for (let i = 0; i < 30; i++) {
-          await new Promise((r) => setTimeout(r, 2000));
-          try {
-            const status = await getOrderStatus(purchaseTxSig);
-            if (status.status === "filled") {
-              filled = true;
-              break;
-            }
-          } catch {
-            // Keep polling
-          }
-        }
-      }
-
-      if (!filled) {
-        console.error("[Webhook] DFlow order not filled");
+        console.log("[Webhook] Transaction confirmed:", purchaseTxSig);
+      } catch (confirmErr) {
+        console.error("[Webhook] Transaction failed:", confirmErr);
         // TODO: Refund via Stripe
         return;
       }
 
-      tokensReceived = parseInt(orderResponse.quote.outputAmount || shares);
+      tokensReceived = Number(orderResponse.outAmount || shares);
     }
 
     // Create gift record
