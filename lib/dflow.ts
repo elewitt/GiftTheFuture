@@ -134,14 +134,22 @@ export async function getMarketByMint(
 
 /**
  * Get outcome token mint addresses (YES and NO) for a market.
+ * DFlow markets have accounts keyed by collateral type - we use USDC.
  */
 export async function getOutcomeMints(
   ticker: string
 ): Promise<{ yesMint: string; noMint: string }> {
   const market = await getMarket(ticker);
+
+  // Accounts are nested by collateral mint (USDC)
+  const usdcAccounts = market.accounts[USDC_MINT];
+  if (!usdcAccounts) {
+    throw new Error(`No USDC-collateralized market found for ${ticker}`);
+  }
+
   return {
-    yesMint: market.accounts.yesMint,
-    noMint: market.accounts.noMint,
+    yesMint: usdcAccounts.yesMint,
+    noMint: usdcAccounts.noMint,
   };
 }
 
