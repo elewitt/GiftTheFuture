@@ -170,21 +170,9 @@ export function MarketSearch({
   return (
     <div className="relative w-full">
       {/* Search Input */}
-      <div className="relative">
-        <input
-          ref={inputRef}
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => setIsOpen(true)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          autoFocus={autoFocus}
-          className="w-full px-5 py-4 pl-12 pr-12 rounded-2xl bg-slate-900/80 border border-slate-800 text-slate-200 text-base placeholder:text-slate-600 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition"
-        />
-        {/* Search Icon */}
+      <div className="group relative flex items-center rounded-2xl border border-border bg-card/80 px-5 py-4 backdrop-blur-sm transition-all focus-within:border-primary focus-within:glow-primary">
         <svg
-          className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-600"
+          className="mr-3 h-5 w-5 text-muted-foreground"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -196,24 +184,35 @@ export function MarketSearch({
             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
           />
         </svg>
-        {/* Loading / Clear */}
-        <div className="absolute right-4 top-1/2 -translate-y-1/2">
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => setIsOpen(true)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          autoFocus={autoFocus}
+          className="w-full bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
+        />
+        {/* Loading / Clear / Kbd */}
+        <div className="flex-shrink-0">
           {isLoading ? (
-            <div className="w-5 h-5 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+            <div className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
           ) : query ? (
             <button
               onClick={() => {
                 setQuery("");
                 inputRef.current?.focus();
               }}
-              className="p-1 hover:bg-slate-800 rounded-full transition"
+              className="p-1 hover:bg-secondary rounded-full transition"
             >
-              <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           ) : (
-            <kbd className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-mono text-slate-600 bg-slate-800/50 rounded border border-slate-700/50">
+            <kbd className="hidden rounded-md border border-border bg-secondary px-2 py-0.5 text-xs text-muted-foreground md:inline-block">
               ⌘K
             </kbd>
           )}
@@ -224,18 +223,18 @@ export function MarketSearch({
       {showDropdown && (
         <div
           ref={dropdownRef}
-          className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden z-50 max-h-[70vh] overflow-y-auto"
+          className="absolute top-full left-0 right-0 mt-2 bg-card border border-border rounded-2xl shadow-xl overflow-hidden z-50 max-h-[70vh] overflow-y-auto"
         >
           {/* Recent Searches */}
           {!query && recentSearches.length > 0 && (
-            <div className="p-3 border-b border-slate-800/50">
+            <div className="p-3 border-b border-border">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Recent Searches
                 </span>
                 <button
                   onClick={clearRecentSearches}
-                  className="text-[10px] text-slate-600 hover:text-slate-400 transition"
+                  className="text-[10px] text-muted-foreground hover:text-foreground transition"
                 >
                   Clear
                 </button>
@@ -245,7 +244,7 @@ export function MarketSearch({
                   <button
                     key={search}
                     onClick={() => handleRecentClick(search)}
-                    className="px-3 py-1.5 text-xs text-slate-400 bg-slate-800/50 rounded-lg hover:bg-slate-800 hover:text-slate-300 transition"
+                    className="px-3 py-1.5 text-xs text-muted-foreground bg-secondary rounded-lg hover:bg-secondary/80 hover:text-foreground transition"
                   >
                     {search}
                   </button>
@@ -257,16 +256,16 @@ export function MarketSearch({
           {/* Section Header */}
           {!query && trendingMarkets.length > 0 && (
             <div className="px-4 pt-3 pb-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                🔥 Trending Markets
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Trending Markets
               </span>
             </div>
           )}
 
           {query && results.length > 0 && (
             <div className="px-4 pt-3 pb-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                {results.length} result{results.length !== 1 ? "s" : ""} for "{query}"
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {results.length} result{results.length !== 1 ? "s" : ""} for &quot;{query}&quot;
               </span>
             </div>
           )}
@@ -274,16 +273,16 @@ export function MarketSearch({
           {/* Loading State */}
           {isLoading && query && (
             <div className="p-6 text-center">
-              <div className="w-6 h-6 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mx-auto mb-2" />
-              <p className="text-xs text-slate-500">Searching markets...</p>
+              <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-2" />
+              <p className="text-xs text-muted-foreground">Searching markets...</p>
             </div>
           )}
 
           {/* No Results */}
           {!isLoading && query && results.length === 0 && (
             <div className="p-6 text-center">
-              <p className="text-slate-400 text-sm mb-1">No markets found for "{query}"</p>
-              <p className="text-slate-600 text-xs">Try different keywords</p>
+              <p className="text-foreground text-sm mb-1">No markets found for &quot;{query}&quot;</p>
+              <p className="text-muted-foreground text-xs">Try different keywords</p>
             </div>
           )}
 
@@ -303,19 +302,19 @@ export function MarketSearch({
           )}
 
           {/* Footer Hint */}
-          <div className="px-4 py-2 border-t border-slate-800/50 bg-slate-900/50">
-            <div className="flex items-center justify-between text-[10px] text-slate-600">
+          <div className="px-4 py-2 border-t border-border bg-secondary/50">
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
               <span>
-                <kbd className="px-1.5 py-0.5 bg-slate-800 rounded mr-1">↑</kbd>
-                <kbd className="px-1.5 py-0.5 bg-slate-800 rounded mr-1">↓</kbd>
+                <kbd className="px-1.5 py-0.5 bg-card border border-border rounded mr-1">↑</kbd>
+                <kbd className="px-1.5 py-0.5 bg-card border border-border rounded mr-1">↓</kbd>
                 to navigate
               </span>
               <span>
-                <kbd className="px-1.5 py-0.5 bg-slate-800 rounded mr-1">↵</kbd>
+                <kbd className="px-1.5 py-0.5 bg-card border border-border rounded mr-1">↵</kbd>
                 to select
               </span>
               <span>
-                <kbd className="px-1.5 py-0.5 bg-slate-800 rounded">esc</kbd>
+                <kbd className="px-1.5 py-0.5 bg-card border border-border rounded">esc</kbd>
                 to close
               </span>
             </div>
@@ -344,23 +343,23 @@ function MarketResultItem({
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       className={`w-full px-4 py-3 flex items-center gap-4 text-left transition ${
-        isSelected ? "bg-indigo-500/10" : "hover:bg-slate-800/50"
+        isSelected ? "bg-primary/10" : "hover:bg-secondary/50"
       }`}
     >
       {/* Price Badge */}
-      <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 flex flex-col items-center justify-center">
-        <span className="text-emerald-400 text-sm font-bold">{yesPercent}¢</span>
-        <span className="text-[8px] text-slate-500 uppercase">Yes</span>
+      <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-secondary border border-border flex flex-col items-center justify-center">
+        <span className="text-primary text-sm font-bold">{yesPercent}¢</span>
+        <span className="text-[8px] text-muted-foreground uppercase">Yes</span>
       </div>
 
       {/* Market Info */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-200 truncate">{market.title}</p>
+        <p className="text-sm font-medium text-foreground truncate">{market.title}</p>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800/80 text-slate-500">
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">
             {market.category}
           </span>
-          <span className="text-[10px] text-slate-600 font-mono">
+          <span className="text-[10px] text-muted-foreground font-mono">
             {formatVolume(market.volume24h || market.volume)} vol
           </span>
         </div>
@@ -369,7 +368,7 @@ function MarketResultItem({
       {/* Arrow */}
       <svg
         className={`w-4 h-4 flex-shrink-0 transition ${
-          isSelected ? "text-indigo-400" : "text-slate-700"
+          isSelected ? "text-primary" : "text-border"
         }`}
         fill="none"
         viewBox="0 0 24 24"

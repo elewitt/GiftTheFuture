@@ -9,7 +9,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   if (!appId) {
     return (
       <div style={{ padding: 40, color: "#f43f5e", fontFamily: "monospace" }}>
-        <h2>⚠️ Missing NEXT_PUBLIC_PRIVY_APP_ID</h2>
+        <h2>Missing NEXT_PUBLIC_PRIVY_APP_ID</h2>
         <p>Add your Privy App ID to <code>.env.local</code> and restart the dev server.</p>
       </div>
     );
@@ -21,7 +21,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       config={{
         appearance: {
           theme: "dark",
-          accentColor: "#6366f1",
+          accentColor: "#059669", // Teal primary color
           showWalletLoginFirst: false,
           walletChainType: "solana-only",
         },

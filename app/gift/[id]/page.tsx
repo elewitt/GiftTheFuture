@@ -5,6 +5,8 @@ import { useSolanaWallets, useCreateWallet } from "@privy-io/react-auth/solana";
 import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
 
 interface GiftData {
   id: string;
@@ -18,7 +20,7 @@ interface GiftData {
   status: string;
 }
 
-type ClaimStep = 
+type ClaimStep =
   | "loading"
   | "reveal"        // Show the gift box, waiting to be opened
   | "opening"       // Animation of opening
@@ -175,7 +177,7 @@ export default function GiftClaimPage() {
       setClaimTx(data.signature);
       setConfetti(true);
       setStep("claimed");
-      
+
       // Stop confetti after a few seconds
       setTimeout(() => setConfetti(false), 5000);
     } catch (err) {
@@ -202,7 +204,7 @@ export default function GiftClaimPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
         <div className="text-center">
-          <div className="w-10 h-10 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-10 h-10 border-2 border-primary-500/20 border-t-primary-500 rounded-full animate-spin mx-auto mb-4" />
           <p className="text-sm text-slate-500">Loading your gift...</p>
         </div>
       </div>
@@ -223,7 +225,7 @@ export default function GiftClaimPage() {
           </p>
           <Link
             href="/"
-            className="text-sm text-indigo-400 hover:text-indigo-300"
+            className="text-sm text-primary-400 hover:text-primary-300"
           >
             ← Browse markets
           </Link>
@@ -237,18 +239,15 @@ export default function GiftClaimPage() {
     return (
       <div className="min-h-screen flex items-center justify-center px-5 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
         <div className="text-center max-w-sm">
-          <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-6">
+          <div className="w-20 h-20 rounded-full bg-primary-500/10 border border-primary-500/20 flex items-center justify-center mx-auto mb-6">
             <span className="text-4xl">✅</span>
           </div>
           <h1 className="text-xl font-bold mb-2 text-slate-200">Already claimed</h1>
           <p className="text-sm text-slate-500 mb-6">
             This gift has already been claimed.
           </p>
-          <Link
-            href="/dashboard"
-            className="inline-block px-6 py-3 rounded-xl bg-indigo-500 text-white text-sm font-medium hover:bg-indigo-400 transition"
-          >
-            View Dashboard
+          <Link href="/dashboard">
+            <Button>View Dashboard</Button>
           </Link>
         </div>
       </div>
@@ -260,62 +259,67 @@ export default function GiftClaimPage() {
   // ─── Gift Reveal (unopened) ────────────────────────────────
   if (step === "reveal") {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-5 bg-gradient-to-b from-slate-950 via-indigo-950/20 to-slate-950">
+      <div className="min-h-screen flex flex-col items-center justify-center px-5 bg-gradient-to-b from-slate-950 via-primary-950/20 to-slate-950">
         {/* Floating particles background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-indigo-500/30 rounded-full animate-pulse" />
-          <div className="absolute top-1/3 right-1/3 w-1 h-1 bg-violet-500/40 rounded-full animate-pulse delay-300" />
-          <div className="absolute bottom-1/3 left-1/3 w-1.5 h-1.5 bg-emerald-500/30 rounded-full animate-pulse delay-500" />
-          <div className="absolute top-1/2 right-1/4 w-1 h-1 bg-amber-500/30 rounded-full animate-pulse delay-700" />
+          <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-primary-500/30 rounded-full animate-pulse" />
+          <div className="absolute top-1/3 right-1/3 w-1 h-1 bg-accent-500/40 rounded-full animate-pulse delay-300" />
+          <div className="absolute bottom-1/3 left-1/3 w-1.5 h-1.5 bg-primary-500/30 rounded-full animate-pulse delay-500" />
+          <div className="absolute top-1/2 right-1/4 w-1 h-1 bg-accent-500/30 rounded-full animate-pulse delay-700" />
         </div>
 
-        <div className="text-center max-w-md relative z-10">
-          <p className="text-xs font-semibold tracking-[0.2em] uppercase text-indigo-400 mb-6 animate-fade-in">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center max-w-md relative z-10"
+        >
+          <p className="text-xs font-semibold tracking-[0.2em] uppercase text-primary-400 mb-6">
             You&apos;ve received a gift
           </p>
-          
+
           {/* Gift box */}
           <button
             onClick={handleOpenGift}
             className="group relative mb-8 focus:outline-none"
           >
             {/* Glow effect */}
-            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-violet-500 to-emerald-500 rounded-3xl blur-2xl opacity-30 group-hover:opacity-50 transition-opacity" />
-            
+            <div className="absolute inset-0 bg-gradient-brand rounded-3xl blur-2xl opacity-30 group-hover:opacity-50 transition-opacity" />
+
             {/* Gift box */}
-            <div className="relative w-40 h-40 mx-auto bg-gradient-to-br from-indigo-500 via-violet-500 to-purple-600 rounded-3xl shadow-2xl transform group-hover:scale-105 transition-all duration-300">
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              className="relative w-40 h-40 mx-auto bg-gradient-brand rounded-3xl shadow-2xl"
+            >
               {/* Ribbon horizontal */}
-              <div className="absolute top-1/2 left-0 right-0 h-4 bg-amber-400/90 -translate-y-1/2" />
+              <div className="absolute top-1/2 left-0 right-0 h-4 bg-accent-400/90 -translate-y-1/2" />
               {/* Ribbon vertical */}
-              <div className="absolute top-0 bottom-0 left-1/2 w-4 bg-amber-400/90 -translate-x-1/2" />
+              <div className="absolute top-0 bottom-0 left-1/2 w-4 bg-accent-400/90 -translate-x-1/2" />
               {/* Bow */}
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-4xl">
                 🎀
               </div>
               {/* Shimmer */}
               <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/20 to-white/0 rounded-3xl" />
-            </div>
+            </motion.div>
           </button>
 
           <h1 className="text-2xl font-bold text-slate-100 mb-3">
             {gift.recipientName ? `${gift.recipientName}, someone` : "Someone"} sent you
             <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-emerald-400">
+            <span className="text-gradient-brand">
               a stake in the future
             </span>
           </h1>
-          
+
           <p className="text-slate-500 text-sm mb-8">
             Tap the gift to see what&apos;s inside
           </p>
 
-          <button
-            onClick={handleOpenGift}
-            className="px-8 py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white font-bold text-base hover:opacity-90 transition shadow-lg shadow-indigo-500/25"
-          >
+          <Button onClick={handleOpenGift} size="lg">
             Open Your Gift 🎁
-          </button>
-        </div>
+          </Button>
+        </motion.div>
       </div>
     );
   }
@@ -323,15 +327,19 @@ export default function GiftClaimPage() {
   // ─── Opening animation ────────────────────────────────────
   if (step === "opening") {
     return (
-      <div className="min-h-screen flex items-center justify-center px-5 bg-gradient-to-b from-slate-950 via-indigo-950/30 to-slate-950">
+      <div className="min-h-screen flex items-center justify-center px-5 bg-gradient-to-b from-slate-950 via-primary-950/30 to-slate-950">
         <div className="text-center">
           {/* Animated gift box opening */}
-          <div className="relative w-40 h-40 mx-auto mb-8 animate-bounce">
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-violet-500 to-purple-600 rounded-3xl animate-pulse" />
+          <motion.div
+            animate={{ scale: [1, 1.1, 1], rotate: [0, -5, 5, 0] }}
+            transition={{ duration: 0.5, repeat: 2 }}
+            className="relative w-40 h-40 mx-auto mb-8"
+          >
+            <div className="absolute inset-0 bg-gradient-brand rounded-3xl animate-pulse" />
             <div className="absolute inset-0 flex items-center justify-center">
               <span className="text-6xl animate-spin">✨</span>
             </div>
-          </div>
+          </motion.div>
           <p className="text-slate-400 animate-pulse">Opening your gift...</p>
         </div>
       </div>
@@ -341,23 +349,28 @@ export default function GiftClaimPage() {
   // ─── Opened - show contents ────────────────────────────────
   if (step === "opened" || step === "signing_in") {
     const potentialPayout = gift.tokenAmount;
-    
+
     return (
       <div className="min-h-screen flex items-center justify-center px-5 py-10 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
-        <div className="text-center max-w-md w-full">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="text-center max-w-md w-full"
+        >
           {/* Celebration emoji */}
           <div className="text-5xl mb-4 animate-bounce">🎉</div>
-          
-          <p className="text-xs font-semibold tracking-[0.15em] uppercase text-emerald-400 mb-2">
+
+          <p className="text-xs font-semibold tracking-[0.15em] uppercase text-primary-400 mb-2">
             Here&apos;s what you got
           </p>
-          
+
           <h1 className="text-2xl font-bold text-slate-100 mb-6">
             A prediction market position
           </h1>
 
           {/* Position card */}
-          <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700/50 rounded-3xl p-6 text-left mb-6 shadow-xl">
+          <div className="glass rounded-3xl p-6 text-left mb-6 shadow-xl">
             {/* Market title */}
             <div className="mb-4">
               <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Market</p>
@@ -370,7 +383,7 @@ export default function GiftClaimPage() {
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="bg-slate-800/50 rounded-xl p-3">
                 <p className="text-xs text-slate-500 mb-1">Your Bet</p>
-                <p className={`text-xl font-bold ${gift.side === "yes" ? "text-emerald-400" : "text-red-400"}`}>
+                <p className={`text-xl font-bold ${gift.side === "yes" ? "text-primary-400" : "text-red-400"}`}>
                   {gift.side.toUpperCase()}
                 </p>
               </div>
@@ -383,13 +396,13 @@ export default function GiftClaimPage() {
             </div>
 
             {/* Potential payout */}
-            <div className="bg-gradient-to-r from-amber-500/10 to-emerald-500/10 border border-amber-500/20 rounded-xl p-4">
+            <div className="bg-gradient-brand-subtle border border-accent-500/20 rounded-xl p-4">
               <div className="flex justify-between items-center">
                 <div>
                   <p className="text-xs text-slate-400">If {gift.side.toUpperCase()} wins</p>
                   <p className="text-xs text-slate-500">You&apos;ll receive</p>
                 </div>
-                <p className="text-2xl font-bold text-amber-400">
+                <p className="text-2xl font-bold text-accent-400">
                   ${potentialPayout.toFixed(2)}
                 </p>
               </div>
@@ -409,10 +422,11 @@ export default function GiftClaimPage() {
           {/* Action button */}
           {!authenticated ? (
             <div>
-              <button
+              <Button
                 onClick={handleSignIn}
                 disabled={step === "signing_in"}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white font-bold text-base hover:opacity-90 transition disabled:opacity-50 shadow-lg shadow-indigo-500/25"
+                size="lg"
+                className="w-full"
               >
                 {step === "signing_in" ? (
                   <span className="flex items-center justify-center gap-2">
@@ -422,18 +436,18 @@ export default function GiftClaimPage() {
                 ) : (
                   "Claim Your Gift →"
                 )}
-              </button>
+              </Button>
               <p className="text-xs text-slate-600 mt-3">
                 Sign in with email, Google, or phone — no crypto wallet needed
               </p>
             </div>
           ) : (
             <div className="py-4">
-              <div className="w-6 h-6 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mx-auto mb-3" />
+              <div className="w-6 h-6 border-2 border-primary-500/20 border-t-primary-500 rounded-full animate-spin mx-auto mb-3" />
               <p className="text-sm text-slate-400">Setting up your wallet...</p>
             </div>
           )}
-        </div>
+        </motion.div>
       </div>
     );
   }
@@ -444,8 +458,8 @@ export default function GiftClaimPage() {
       <div className="min-h-screen flex items-center justify-center px-5 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
         <div className="text-center max-w-sm">
           <div className="relative w-20 h-20 mx-auto mb-6">
-            <div className="absolute inset-0 bg-indigo-500/20 rounded-full animate-ping" />
-            <div className="relative w-20 h-20 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-full flex items-center justify-center">
+            <div className="absolute inset-0 bg-primary-500/20 rounded-full animate-ping" />
+            <div className="relative w-20 h-20 bg-gradient-brand rounded-full flex items-center justify-center">
               <div className="w-8 h-8 border-3 border-white/30 border-t-white rounded-full animate-spin" />
             </div>
           </div>
@@ -456,9 +470,9 @@ export default function GiftClaimPage() {
             Transferring to your wallet on Solana...
           </p>
           <div className="mt-6 flex justify-center gap-1">
-            <span className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-            <span className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-            <span className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+            <span className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+            <span className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+            <span className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
           </div>
         </div>
       </div>
@@ -468,7 +482,7 @@ export default function GiftClaimPage() {
   // ─── Claimed successfully ────────────────────────────────
   if (step === "claimed") {
     return (
-      <div className="min-h-screen flex items-center justify-center px-5 py-10 bg-gradient-to-b from-slate-950 via-emerald-950/10 to-slate-950 relative overflow-hidden">
+      <div className="min-h-screen flex items-center justify-center px-5 py-10 bg-gradient-to-b from-slate-950 via-primary-950/10 to-slate-950 relative overflow-hidden">
         {/* Confetti */}
         {confetti && (
           <div className="absolute inset-0 pointer-events-none">
@@ -486,7 +500,7 @@ export default function GiftClaimPage() {
                 <div
                   className="w-3 h-3 rounded-sm"
                   style={{
-                    backgroundColor: ["#6366f1", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#ec4899"][
+                    backgroundColor: ["#059669", "#10b981", "#f59e0b", "#fbbf24", "#ef4444", "#ec4899"][
                       Math.floor(Math.random() * 6)
                     ],
                     transform: `rotate(${Math.random() * 360}deg)`,
@@ -497,11 +511,16 @@ export default function GiftClaimPage() {
           </div>
         )}
 
-        <div className="text-center max-w-md w-full relative z-10">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="text-center max-w-md w-full relative z-10"
+        >
           {/* Success checkmark */}
           <div className="relative w-24 h-24 mx-auto mb-6">
-            <div className="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping" />
-            <div className="relative w-24 h-24 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/30">
+            <div className="absolute inset-0 bg-primary-500/20 rounded-full animate-ping" />
+            <div className="relative w-24 h-24 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center shadow-lg glow-primary">
               <svg className="w-12 h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
               </svg>
@@ -516,7 +535,7 @@ export default function GiftClaimPage() {
           </p>
 
           {/* Position summary card */}
-          <div className="bg-slate-900/80 border border-slate-700/50 rounded-2xl p-5 text-left mb-6">
+          <div className="glass rounded-2xl p-5 text-left mb-6">
             <div className="flex justify-between items-start mb-4">
               <div className="flex-1">
                 <p className="text-xs text-slate-500 mb-1">Market</p>
@@ -527,7 +546,7 @@ export default function GiftClaimPage() {
             <div className="grid grid-cols-3 gap-3 mb-4">
               <div className="bg-slate-800/50 rounded-xl p-3 text-center">
                 <p className="text-xs text-slate-500 mb-1">Position</p>
-                <p className={`text-lg font-bold ${gift.side === "yes" ? "text-emerald-400" : "text-red-400"}`}>
+                <p className={`text-lg font-bold ${gift.side === "yes" ? "text-primary-400" : "text-red-400"}`}>
                   {gift.side.toUpperCase()}
                 </p>
               </div>
@@ -537,7 +556,7 @@ export default function GiftClaimPage() {
               </div>
               <div className="bg-slate-800/50 rounded-xl p-3 text-center">
                 <p className="text-xs text-slate-500 mb-1">Payout</p>
-                <p className="text-lg font-bold text-amber-400">${gift.tokenAmount.toFixed(2)}</p>
+                <p className="text-lg font-bold text-accent-400">${gift.tokenAmount.toFixed(2)}</p>
               </div>
             </div>
 
@@ -546,7 +565,7 @@ export default function GiftClaimPage() {
                 href={`https://solscan.io/tx/${claimTx}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 text-xs text-indigo-400 hover:text-indigo-300 transition"
+                className="flex items-center justify-center gap-2 text-xs text-primary-400 hover:text-primary-300 transition"
               >
                 <span>View on Solscan</span>
                 <span className="font-mono">{claimTx.slice(0, 6)}...{claimTx.slice(-4)}</span>
@@ -558,17 +577,17 @@ export default function GiftClaimPage() {
           </div>
 
           {/* What's next */}
-          <div className="bg-slate-900/40 border border-slate-800/50 rounded-xl p-4 mb-6 text-left">
+          <div className="glass rounded-xl p-4 mb-6 text-left">
             <p className="text-xs font-semibold text-slate-400 mb-3">What happens next?</p>
             <div className="space-y-2">
               <div className="flex items-start gap-3">
-                <span className="text-emerald-400 mt-0.5">✓</span>
+                <span className="text-primary-400 mt-0.5">✓</span>
                 <p className="text-sm text-slate-300">
                   <strong>Hold</strong> until the market resolves — if {gift.side.toUpperCase()} wins, you get ${gift.tokenAmount.toFixed(2)}
                 </p>
               </div>
               <div className="flex items-start gap-3">
-                <span className="text-emerald-400 mt-0.5">✓</span>
+                <span className="text-primary-400 mt-0.5">✓</span>
                 <p className="text-sm text-slate-300">
                   <strong>Or cash out</strong> anytime at the current market price
                 </p>
@@ -578,24 +597,22 @@ export default function GiftClaimPage() {
 
           {/* Action buttons */}
           <div className="grid grid-cols-2 gap-3">
-            <Link
-              href="/dashboard"
-              className="py-4 rounded-xl bg-slate-800 text-slate-200 text-sm font-semibold hover:bg-slate-700 transition text-center"
-            >
-              View Dashboard
+            <Link href="/dashboard">
+              <Button variant="secondary" className="w-full">
+                View Dashboard
+              </Button>
             </Link>
-            <Link
-              href={`/dashboard?action=cashout&market=${gift.marketTicker}`}
-              className="py-4 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-sm font-semibold hover:opacity-90 transition text-center"
-            >
-              Cash Out Now
+            <Link href={`/dashboard?action=cashout&market=${gift.marketTicker}`}>
+              <Button variant="success" className="w-full">
+                Cash Out Now
+              </Button>
             </Link>
           </div>
 
           <p className="text-xs text-slate-600 mt-6">
             Your position is on Solana and can be traded on any compatible DEX
           </p>
-        </div>
+        </motion.div>
       </div>
     );
   }
@@ -617,7 +634,7 @@ export default function GiftClaimPage() {
               {walletError}
             </p>
           )}
-          <button
+          <Button
             onClick={() => {
               setWalletError(null);
               walletRetryCount.current = 0;
@@ -637,10 +654,9 @@ export default function GiftClaimPage() {
                   });
               }
             }}
-            className="px-6 py-3 rounded-xl bg-indigo-500 text-white font-medium hover:bg-indigo-400 transition"
           >
             Try Again
-          </button>
+          </Button>
         </div>
       </div>
     );

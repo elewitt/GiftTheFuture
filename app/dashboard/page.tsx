@@ -6,6 +6,10 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { VersionedTransaction, Connection, PublicKey, Transaction } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync, createTransferInstruction, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { motion } from "framer-motion";
+import { Navbar } from "@/components/Navbar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
@@ -445,7 +449,7 @@ export default function DashboardPage() {
   if (!ready) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-950 to-slate-900">
-        <div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-primary-500/20 border-t-primary-500 rounded-full animate-spin" />
       </div>
     );
   }
@@ -453,65 +457,51 @@ export default function DashboardPage() {
   if (!authenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center px-5 bg-gradient-to-b from-slate-950 to-slate-900">
-        <div className="text-center max-w-sm">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-violet-500/20 flex items-center justify-center mx-auto mb-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center max-w-sm"
+        >
+          <div className="w-20 h-20 rounded-2xl bg-gradient-brand-subtle flex items-center justify-center mx-auto mb-6">
             <span className="text-4xl">📊</span>
           </div>
           <h1 className="text-2xl font-bold mb-3 text-slate-100">Your Dashboard</h1>
           <p className="text-sm text-slate-500 mb-8">
             Sign in to see your prediction market positions, track your gifts, and cash out anytime.
           </p>
-          <button
-            onClick={login}
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white font-bold text-base hover:opacity-90 transition"
-          >
+          <Button onClick={login} size="lg" className="w-full">
             Sign In to Continue
-          </button>
-        </div>
+          </Button>
+        </motion.div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900">
-      {/* Header */}
-      <header className="border-b border-slate-800/50">
-        <div className="max-w-5xl mx-auto px-5 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-500 flex items-center justify-center text-lg">
-              🎁
-            </div>
-            <span className="text-lg font-bold text-slate-100">Gift the Future</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-xs text-slate-500 hidden sm:block">
-              {user?.email?.address || "Connected"}
-            </span>
-            <button
-              onClick={logout}
-              className="text-xs text-slate-500 hover:text-slate-300 transition px-3 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700"
-            >
-              Sign Out
-            </button>
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
-      <div className="max-w-5xl mx-auto px-5 py-8">
+      <div className="pt-24 max-w-5xl mx-auto px-5 pb-20">
         {/* Summary Cards */}
         {data && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
+          >
             <SummaryCard
               label="Portfolio Value"
               value={`$${data.summary.totalValue.toFixed(2)}`}
               subtext={`${data.summary.positionCount} position${data.summary.positionCount !== 1 ? "s" : ""}`}
-              color="indigo"
+              color="primary"
             />
             <SummaryCard
               label="Potential Payout"
               value={`$${data.summary.totalPotential.toFixed(2)}`}
               subtext="If all correct"
-              color="amber"
+              color="accent"
             />
             <SummaryCard
               label="Total P&L"
@@ -525,33 +515,34 @@ export default function DashboardPage() {
               subtext={data.summary.pendingCount > 0 ? `${data.summary.pendingCount} pending` : "All claimed"}
               color="violet"
             />
-          </div>
+          </motion.div>
         )}
 
         {/* Wallet Balance Card */}
         {wallets.length > 0 && (
-          <div className="mb-6 p-5 rounded-2xl bg-gradient-to-br from-emerald-500/5 to-teal-500/5 border border-emerald-500/20">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="mb-6 p-5 rounded-2xl bg-gradient-to-br from-primary-500/5 to-accent-500/5 border border-primary-500/20"
+          >
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Wallet Balance</p>
-                <p className="text-2xl font-bold text-emerald-400">
+                <p className="text-2xl font-bold text-primary-400">
                   ${usdcBalance !== null ? usdcBalance.toFixed(2) : "—"} <span className="text-base font-normal text-slate-500">USDC</span>
                 </p>
                 <p className="text-xs text-slate-600 mt-1">
                   {solBalance !== null ? `${solBalance.toFixed(4)} SOL for fees` : "Loading..."}
                 </p>
               </div>
-              <button
+              <Button
                 onClick={openWithdrawModal}
                 disabled={!usdcBalance || usdcBalance <= 0}
-                className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition ${
-                  usdcBalance && usdcBalance > 0
-                    ? "bg-emerald-500 text-white hover:bg-emerald-400"
-                    : "bg-slate-800 text-slate-500 cursor-not-allowed"
-                }`}
+                variant="success"
               >
                 Withdraw USDC
-              </button>
+              </Button>
             </div>
             <div className="pt-3 border-t border-slate-800/50">
               <p className="text-[10px] text-slate-600 mb-1">Your wallet address</p>
@@ -559,34 +550,45 @@ export default function DashboardPage() {
                 {wallets.find((w) => w.walletClientType === "privy")?.address || wallets[0]?.address}
               </p>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* Pending Gifts Alert */}
         {data && data.pending.length > 0 && (
-          <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.15 }}
+            className="mb-6 p-4 rounded-xl bg-gradient-to-r from-accent-500/10 to-accent-600/10 border border-accent-500/20"
+          >
             <div className="flex items-center gap-3">
               <span className="text-2xl">🎁</span>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-amber-200">
+                <p className="text-sm font-semibold text-accent-200">
                   You have {data.pending.length} gift{data.pending.length > 1 ? "s" : ""} waiting!
                 </p>
-                <p className="text-xs text-amber-200/60">
+                <p className="text-xs text-accent-200/60">
                   Click the Pending tab to claim your positions.
                 </p>
               </div>
-              <button
+              <Button
                 onClick={() => setActiveTab("pending")}
-                className="px-4 py-2 rounded-lg bg-amber-500/20 text-amber-200 text-sm font-medium hover:bg-amber-500/30 transition"
+                variant="outline"
+                size="sm"
               >
                 View Gifts
-              </button>
+              </Button>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* Tabs */}
-        <div className="flex gap-1 p-1 bg-slate-900/50 rounded-xl mb-6 w-fit">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="flex gap-1 p-1 bg-slate-900/50 rounded-xl mb-6 w-fit"
+        >
           <TabButton
             active={activeTab === "positions"}
             onClick={() => setActiveTab("positions")}
@@ -609,12 +611,12 @@ export default function DashboardPage() {
           >
             Pending
           </TabButton>
-        </div>
+        </motion.div>
 
         {/* Content */}
         {loading ? (
           <div className="py-20 text-center">
-            <div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4" />
+            <div className="w-8 h-8 border-2 border-primary-500/20 border-t-primary-500 rounded-full animate-spin mx-auto mb-4" />
             <p className="text-sm text-slate-500">Loading your dashboard...</p>
           </div>
         ) : error ? (
@@ -632,12 +634,10 @@ export default function DashboardPage() {
 
         {/* Quick Action */}
         <div className="mt-12 text-center">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-800/50 text-slate-300 text-sm font-medium hover:bg-slate-800 transition"
-          >
-            <span>🔍</span>
-            Browse Markets & Send a Gift
+          <Link href="/">
+            <Button variant="secondary">
+              🔍 Browse Markets & Send a Gift
+            </Button>
           </Link>
         </div>
       </div>
@@ -675,19 +675,19 @@ function SummaryCard({
   label: string;
   value: string;
   subtext: string;
-  color: "indigo" | "amber" | "emerald" | "red" | "violet";
+  color: "primary" | "accent" | "emerald" | "red" | "violet";
 }) {
   const colorClasses = {
-    indigo: "from-indigo-500/10 to-indigo-500/5 border-indigo-500/20",
-    amber: "from-amber-500/10 to-amber-500/5 border-amber-500/20",
+    primary: "from-primary-500/10 to-primary-500/5 border-primary-500/20",
+    accent: "from-accent-500/10 to-accent-500/5 border-accent-500/20",
     emerald: "from-emerald-500/10 to-emerald-500/5 border-emerald-500/20",
     red: "from-red-500/10 to-red-500/5 border-red-500/20",
     violet: "from-violet-500/10 to-violet-500/5 border-violet-500/20",
   };
 
   const textColors = {
-    indigo: "text-indigo-400",
-    amber: "text-amber-400",
+    primary: "text-primary-400",
+    accent: "text-accent-400",
     emerald: "text-emerald-400",
     red: "text-red-400",
     violet: "text-violet-400",
@@ -729,7 +729,7 @@ function TabButton({
         <span
           className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
             highlight
-              ? "bg-amber-500/20 text-amber-400"
+              ? "bg-accent-500/20 text-accent-400"
               : active
               ? "bg-slate-700 text-slate-300"
               : "bg-slate-800/50 text-slate-500"
@@ -753,11 +753,8 @@ function PositionsTab({ positions, onCashout }: { positions: Position[]; onCasho
         <p className="text-sm text-slate-600 max-w-sm mx-auto mb-6">
           When someone sends you a prediction market gift and you claim it, your position will appear here.
         </p>
-        <Link
-          href="/"
-          className="inline-block px-6 py-3 rounded-xl bg-indigo-500 text-white text-sm font-medium hover:bg-indigo-400 transition"
-        >
-          Browse Markets
+        <Link href="/">
+          <Button>Browse Markets</Button>
         </Link>
       </div>
     );
@@ -777,14 +774,18 @@ function PositionCard({ position, onCashout }: { position: Position; onCashout: 
   const isProfit = position.profitLoss >= 0;
 
   return (
-    <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800/50 hover:border-slate-700/50 transition">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="p-5 rounded-2xl glass"
+    >
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span
               className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                 position.side === "yes"
-                  ? "bg-emerald-500/10 text-emerald-400"
+                  ? "bg-primary-500/10 text-primary-400"
                   : "bg-red-500/10 text-red-400"
               }`}
             >
@@ -810,12 +811,12 @@ function PositionCard({ position, onCashout }: { position: Position; onCashout: 
       <div className="mb-4">
         <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all"
+            className="h-full bg-gradient-to-r from-primary-500 to-primary-400 rounded-full transition-all"
             style={{ width: `${pricePercent}%` }}
           />
         </div>
         <div className="flex justify-between text-[10px] mt-1">
-          <span className="text-emerald-400">Yes {pricePercent}¢</span>
+          <span className="text-primary-400">Yes {pricePercent}¢</span>
           <span className="text-red-400">No {100 - pricePercent}¢</span>
         </div>
       </div>
@@ -830,17 +831,19 @@ function PositionCard({ position, onCashout }: { position: Position; onCashout: 
 
       {/* Actions */}
       <div className="flex gap-2 mt-4 pt-4 border-t border-slate-800/50">
-        <button className="flex-1 py-2.5 rounded-xl bg-slate-800/50 text-slate-400 text-xs font-medium hover:bg-slate-800 transition">
+        <Button variant="secondary" size="sm" className="flex-1">
           Hold Position
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => onCashout(position)}
-          className="flex-1 py-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/20 transition"
+          variant="success"
+          size="sm"
+          className="flex-1"
         >
           Cash Out · ${position.currentValue.toFixed(2)}
-        </button>
+        </Button>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -848,7 +851,7 @@ function Stat({ label, value, highlight }: { label: string; value: string; highl
   return (
     <div>
       <p className="text-[10px] text-slate-600 uppercase">{label}</p>
-      <p className={`text-sm font-semibold ${highlight ? "text-amber-400" : "text-slate-200"}`}>
+      <p className={`text-sm font-semibold ${highlight ? "text-accent-400" : "text-slate-200"}`}>
         {value}
       </p>
     </div>
@@ -866,11 +869,8 @@ function SentTab({ gifts }: { gifts: SentGift[] }) {
         <p className="text-sm text-slate-600 max-w-sm mx-auto mb-6">
           Send someone a prediction market position as a gift. They'll receive an email with a link to claim it.
         </p>
-        <Link
-          href="/"
-          className="inline-block px-6 py-3 rounded-xl bg-indigo-500 text-white text-sm font-medium hover:bg-indigo-400 transition"
-        >
-          Send a Gift
+        <Link href="/">
+          <Button>Send a Gift</Button>
         </Link>
       </div>
     );
@@ -887,8 +887,8 @@ function SentTab({ gifts }: { gifts: SentGift[] }) {
 
 function SentGiftCard({ gift }: { gift: SentGift }) {
   const statusColors: Record<string, string> = {
-    pending_claim: "bg-amber-500/10 text-amber-400",
-    claimed: "bg-emerald-500/10 text-emerald-400",
+    pending_claim: "bg-accent-500/10 text-accent-400",
+    claimed: "bg-primary-500/10 text-primary-400",
     cashed_out: "bg-blue-500/10 text-blue-400",
     settled: "bg-slate-500/10 text-slate-400",
   };
@@ -901,7 +901,7 @@ function SentGiftCard({ gift }: { gift: SentGift }) {
   };
 
   return (
-    <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800/50">
+    <div className="p-4 rounded-xl glass">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
@@ -952,22 +952,26 @@ function PendingTab({ gifts }: { gifts: PendingGift[] }) {
 
 function PendingGiftCard({ gift }: { gift: PendingGift }) {
   return (
-    <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-500/5 to-orange-500/5 border border-amber-500/20">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="p-5 rounded-2xl bg-gradient-to-br from-accent-500/5 to-accent-600/5 border border-accent-500/20"
+    >
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-lg">🎁</span>
-            <span className="text-[10px] text-amber-400 font-medium uppercase tracking-wider">
+            <span className="text-[10px] text-accent-400 font-medium uppercase tracking-wider">
               New Gift!
             </span>
           </div>
           <h3 className="text-sm font-semibold text-slate-200">{gift.marketTitle}</h3>
           {gift.giftMessage && (
-            <p className="text-xs text-slate-500 mt-1 italic">"{gift.giftMessage}"</p>
+            <p className="text-xs text-slate-500 mt-1 italic">&quot;{gift.giftMessage}&quot;</p>
           )}
         </div>
         <div className="text-right">
-          <p className="text-lg font-bold text-amber-400">${gift.potentialPayout.toFixed(2)}</p>
+          <p className="text-lg font-bold text-accent-400">${gift.potentialPayout.toFixed(2)}</p>
           <p className="text-[10px] text-slate-500">if {gift.side.toUpperCase()} wins</p>
         </div>
       </div>
@@ -977,7 +981,7 @@ function PendingGiftCard({ gift }: { gift: PendingGift }) {
           <p className="text-[10px] text-slate-500">Position</p>
           <p className="text-sm font-semibold text-slate-200">
             {gift.shares.toFixed(1)} x{" "}
-            <span className={gift.side === "yes" ? "text-emerald-400" : "text-red-400"}>
+            <span className={gift.side === "yes" ? "text-primary-400" : "text-red-400"}>
               {gift.side.toUpperCase()}
             </span>
           </p>
@@ -988,13 +992,12 @@ function PendingGiftCard({ gift }: { gift: PendingGift }) {
         </div>
       </div>
 
-      <Link
-        href={`/gift/${gift.id}`}
-        className="block w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-bold text-center hover:opacity-90 transition"
-      >
-        Claim This Gift →
+      <Link href={`/gift/${gift.id}`}>
+        <Button className="w-full">
+          Claim This Gift →
+        </Button>
       </Link>
-    </div>
+    </motion.div>
   );
 }
 
@@ -1016,7 +1019,7 @@ function CashoutModal({
         return (
           <>
             <div className="text-center mb-6">
-              <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-primary-500/10 flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">💰</span>
               </div>
               <h3 className="text-xl font-bold text-slate-100 mb-2">Cash Out Position</h3>
@@ -1042,65 +1045,47 @@ function CashoutModal({
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 mb-6">
+            <div className="p-4 rounded-xl bg-primary-500/10 border border-primary-500/20 mb-6">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-emerald-400">You will receive</span>
-                <span className="text-xl font-bold text-emerald-400">
+                <span className="text-sm text-primary-400">You will receive</span>
+                <span className="text-xl font-bold text-primary-400">
                   ~${position.currentValue.toFixed(2)} USDC
                 </span>
               </div>
-              <p className="text-[10px] text-emerald-400/60 mt-1">
+              <p className="text-[10px] text-primary-400/60 mt-1">
                 Final amount may vary slightly based on market conditions
               </p>
             </div>
 
             <div className="flex gap-3">
-              <button
-                onClick={onClose}
-                className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-medium hover:bg-slate-700 transition"
-              >
+              <Button onClick={onClose} variant="secondary" className="flex-1">
                 Cancel
-              </button>
-              <button
-                onClick={onConfirm}
-                className="flex-1 py-3 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-400 transition"
-              >
+              </Button>
+              <Button onClick={onConfirm} variant="success" className="flex-1">
                 Confirm Cash Out
-              </button>
+              </Button>
             </div>
           </>
         );
 
       case "signing":
-        return (
-          <div className="text-center py-8">
-            <div className="w-12 h-12 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-slate-100 mb-2">Preparing Transaction</h3>
-            <p className="text-sm text-slate-500">Creating your sell order...</p>
-          </div>
-        );
-
       case "sending":
-        return (
-          <div className="text-center py-8">
-            <div className="w-12 h-12 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-slate-100 mb-2">Sign Transaction</h3>
-            <p className="text-sm text-slate-500">Please approve the transaction in your wallet</p>
-          </div>
-        );
-
       case "confirming":
         return (
           <div className="text-center py-8">
-            <div className="w-12 h-12 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-slate-100 mb-2">Confirming Transaction</h3>
-            <p className="text-sm text-slate-500 mb-4">Waiting for blockchain confirmation...</p>
+            <div className="w-12 h-12 border-2 border-primary-500/20 border-t-primary-500 rounded-full animate-spin mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-slate-100 mb-2">
+              {cashout.step === "signing" ? "Preparing Transaction" : cashout.step === "sending" ? "Sign Transaction" : "Confirming Transaction"}
+            </h3>
+            <p className="text-sm text-slate-500">
+              {cashout.step === "signing" ? "Creating your sell order..." : cashout.step === "sending" ? "Please approve in your wallet" : "Waiting for blockchain confirmation..."}
+            </p>
             {cashout.signature && (
               <a
                 href={`https://solscan.io/tx/${cashout.signature}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-indigo-400 hover:text-indigo-300"
+                className="text-xs text-primary-400 hover:text-primary-300 mt-4 inline-block"
               >
                 View on Solscan →
               </a>
@@ -1111,21 +1096,23 @@ function CashoutModal({
       case "done":
         return (
           <div className="text-center py-8">
-            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-primary-500/10 flex items-center justify-center mx-auto mb-4">
               <span className="text-3xl">✅</span>
             </div>
             <h3 className="text-xl font-bold text-slate-100 mb-2">Cash Out Complete!</h3>
             <p className="text-sm text-slate-500 mb-4">
-              You received <span className="text-emerald-400 font-semibold">${cashout.usdcReceived?.toFixed(2)} USDC</span>
+              You received <span className="text-primary-400 font-semibold">${cashout.usdcReceived?.toFixed(2)} USDC</span>
             </p>
             {cashout.signature && (
               <a
                 href={`https://solscan.io/tx/${cashout.signature}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block px-4 py-2 rounded-lg bg-slate-800 text-slate-300 text-sm hover:bg-slate-700 transition"
+                className="inline-block"
               >
-                View Transaction →
+                <Button variant="secondary" size="sm">
+                  View Transaction →
+                </Button>
               </a>
             )}
             <p className="text-xs text-slate-600 mt-4">Refreshing dashboard...</p>
@@ -1141,18 +1128,12 @@ function CashoutModal({
             <h3 className="text-xl font-bold text-slate-100 mb-2">Cash Out Failed</h3>
             <p className="text-sm text-red-400 mb-6">{cashout.error}</p>
             <div className="flex gap-3">
-              <button
-                onClick={onClose}
-                className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-medium hover:bg-slate-700 transition"
-              >
+              <Button onClick={onClose} variant="secondary" className="flex-1">
                 Close
-              </button>
-              <button
-                onClick={onConfirm}
-                className="flex-1 py-3 rounded-xl bg-indigo-500 text-white text-sm font-bold hover:bg-indigo-400 transition"
-              >
+              </Button>
+              <Button onClick={onConfirm} className="flex-1">
                 Try Again
-              </button>
+              </Button>
             </div>
           </div>
         );
@@ -1161,14 +1142,15 @@ function CashoutModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={cashout.step === "confirm" || cashout.step === "error" || cashout.step === "done" ? onClose : undefined}
       />
-
-      {/* Modal */}
-      <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl"
+      >
         {(cashout.step === "confirm" || cashout.step === "error" || cashout.step === "done") && (
           <button
             onClick={onClose}
@@ -1180,7 +1162,7 @@ function CashoutModal({
           </button>
         )}
         {stepContent()}
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -1206,7 +1188,7 @@ function WithdrawModal({
         return (
           <>
             <div className="text-center mb-6">
-              <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-primary-500/10 flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">💸</span>
               </div>
               <h3 className="text-xl font-bold text-slate-100 mb-2">Withdraw USDC</h3>
@@ -1219,12 +1201,12 @@ function WithdrawModal({
               <label className="block text-xs text-slate-500 uppercase tracking-wide mb-2">
                 Destination Wallet Address
               </label>
-              <input
+              <Input
                 type="text"
                 placeholder="Enter Solana wallet address..."
                 value={withdraw.destinationAddress}
                 onChange={(e) => onAddressChange(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700/50 text-slate-200 text-sm placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50 font-mono"
+                className="font-mono"
               />
             </div>
 
@@ -1233,7 +1215,7 @@ function WithdrawModal({
                 Amount (USDC)
               </label>
               <div className="relative">
-                <input
+                <Input
                   type="number"
                   step="0.01"
                   min="0"
@@ -1241,11 +1223,10 @@ function WithdrawModal({
                   placeholder="0.00"
                   value={withdraw.amount}
                   onChange={(e) => onAmountChange(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700/50 text-slate-200 text-sm placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50"
                 />
                 <button
                   onClick={() => onAmountChange(usdcBalance.toFixed(2))}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-primary-500/20 text-primary-400 text-xs font-medium hover:bg-primary-500/30 transition"
                 >
                   MAX
                 </button>
@@ -1255,78 +1236,67 @@ function WithdrawModal({
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-6">
-              <p className="text-xs text-amber-400">
+            <div className="p-4 rounded-xl bg-accent-500/10 border border-accent-500/20 mb-6">
+              <p className="text-xs text-accent-400">
                 <strong>Note:</strong> You'll need a small amount of SOL in your wallet to pay for transaction fees (~0.001 SOL).
               </p>
             </div>
 
             <div className="flex gap-3">
-              <button
-                onClick={onClose}
-                className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-medium hover:bg-slate-700 transition"
-              >
+              <Button onClick={onClose} variant="secondary" className="flex-1">
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={onConfirm}
                 disabled={!withdraw.destinationAddress || !withdraw.amount}
-                className={`flex-1 py-3 rounded-xl text-sm font-bold transition ${
-                  withdraw.destinationAddress && withdraw.amount
-                    ? "bg-emerald-500 text-white hover:bg-emerald-400"
-                    : "bg-slate-800 text-slate-500 cursor-not-allowed"
-                }`}
+                variant="success"
+                className="flex-1"
               >
                 Withdraw
-              </button>
+              </Button>
             </div>
           </>
         );
 
       case "confirming":
-        return (
-          <div className="text-center py-8">
-            <div className="w-12 h-12 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-slate-100 mb-2">Preparing Transaction</h3>
-            <p className="text-sm text-slate-500">Building your withdrawal...</p>
-          </div>
-        );
-
       case "sending":
         return (
           <div className="text-center py-8">
-            <div className="w-12 h-12 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-slate-100 mb-2">Sign Transaction</h3>
-            <p className="text-sm text-slate-500">Please approve in your wallet...</p>
+            <div className="w-12 h-12 border-2 border-primary-500/20 border-t-primary-500 rounded-full animate-spin mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-slate-100 mb-2">
+              {withdraw.step === "confirming" ? "Preparing Transaction" : "Sign Transaction"}
+            </h3>
+            <p className="text-sm text-slate-500">
+              {withdraw.step === "confirming" ? "Building your withdrawal..." : "Please approve in your wallet..."}
+            </p>
           </div>
         );
 
       case "done":
         return (
           <div className="text-center py-8">
-            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-primary-500/10 flex items-center justify-center mx-auto mb-4">
               <span className="text-3xl">✅</span>
             </div>
             <h3 className="text-xl font-bold text-slate-100 mb-2">Withdrawal Complete!</h3>
             <p className="text-sm text-slate-500 mb-4">
-              Sent <span className="text-emerald-400 font-semibold">${withdraw.amount} USDC</span>
+              Sent <span className="text-primary-400 font-semibold">${withdraw.amount} USDC</span>
             </p>
             {withdraw.signature && (
               <a
                 href={`https://solscan.io/tx/${withdraw.signature}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block px-4 py-2 rounded-lg bg-slate-800 text-slate-300 text-sm hover:bg-slate-700 transition"
+                className="inline-block mb-4"
               >
-                View Transaction →
+                <Button variant="secondary" size="sm">
+                  View Transaction →
+                </Button>
               </a>
             )}
-            <button
-              onClick={onClose}
-              className="block w-full mt-4 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-medium hover:bg-slate-700 transition"
-            >
+            <Button onClick={onClose} variant="secondary" className="w-full">
               Close
-            </button>
+            </Button>
           </div>
         );
 
@@ -1339,18 +1309,12 @@ function WithdrawModal({
             <h3 className="text-xl font-bold text-slate-100 mb-2">Withdrawal Failed</h3>
             <p className="text-sm text-red-400 mb-6">{withdraw.error}</p>
             <div className="flex gap-3">
-              <button
-                onClick={onClose}
-                className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-medium hover:bg-slate-700 transition"
-              >
+              <Button onClick={onClose} variant="secondary" className="flex-1">
                 Close
-              </button>
-              <button
-                onClick={onConfirm}
-                className="flex-1 py-3 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-400 transition"
-              >
+              </Button>
+              <Button onClick={onConfirm} variant="success" className="flex-1">
                 Try Again
-              </button>
+              </Button>
             </div>
           </div>
         );
@@ -1359,14 +1323,15 @@ function WithdrawModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={withdraw.step === "form" || withdraw.step === "error" || withdraw.step === "done" ? onClose : undefined}
       />
-
-      {/* Modal */}
-      <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl"
+      >
         {(withdraw.step === "form" || withdraw.step === "error" || withdraw.step === "done") && (
           <button
             onClick={onClose}
@@ -1378,7 +1343,7 @@ function WithdrawModal({
           </button>
         )}
         {stepContent()}
-      </div>
+      </motion.div>
     </div>
   );
 }
