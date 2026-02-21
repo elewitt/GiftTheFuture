@@ -149,7 +149,7 @@ export default function MarketPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-primary-500/20 border-t-primary-500 rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
       </div>
     );
   }
@@ -160,8 +160,8 @@ export default function MarketPage() {
       <div className="min-h-screen flex items-center justify-center px-5">
         <div className="text-center">
           <p className="text-4xl mb-4">🔍</p>
-          <p className="text-red-400 mb-2">{error || "Market not found"}</p>
-          <Link href="/" className="text-sm text-primary-400 hover:text-primary-300">
+          <p className="text-destructive mb-2">{error || "Market not found"}</p>
+          <Link href="/" className="text-sm text-primary hover:text-primary/80">
             ← Back to markets
           </Link>
         </div>
@@ -189,12 +189,12 @@ export default function MarketPage() {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       <Navbar />
 
       {/* Header */}
       <div className="pt-24 max-w-5xl mx-auto px-5">
-        <Link href="/" className="text-sm text-slate-500 hover:text-slate-300 transition flex items-center gap-2 mb-6">
+        <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition flex items-center gap-2 mb-6">
           <span>←</span> Back to markets
         </Link>
       </div>
@@ -209,105 +209,109 @@ export default function MarketPage() {
             className="lg:col-span-3"
           >
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs font-medium tracking-[0.08em] uppercase text-primary-400 px-2 py-1 rounded bg-primary-500/10">
+              <span className="text-xs font-medium tracking-[0.08em] uppercase text-primary px-2 py-1 rounded bg-primary/10">
                 {market.category}
               </span>
-              <span className="text-xs text-slate-600">•</span>
-              <span className="text-xs text-slate-500 font-mono">{market.ticker}</span>
+              <span className="text-xs text-muted-foreground">•</span>
+              <span className="text-xs text-muted-foreground font-mono">{market.ticker}</span>
             </div>
 
-            <h1 className="text-2xl md:text-3xl font-bold text-slate-100 leading-tight mb-2">
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight mb-2">
               {market.title}
             </h1>
 
             {market.subtitle && (
-              <p className="text-slate-500 text-sm mb-6">{market.subtitle}</p>
+              <p className="text-muted-foreground text-sm mb-6">{market.subtitle}</p>
             )}
 
             {/* Large Price Display */}
-            <div className="glass rounded-2xl p-6 mb-6">
+            <div className="bg-card border border-border rounded-2xl p-6 mb-6">
               <div className="flex justify-between items-end mb-4">
                 <div>
-                  <p className="text-xs text-slate-500 uppercase mb-1">Yes Price</p>
-                  <p className="text-4xl font-bold text-primary-400">
+                  <p className="text-xs text-muted-foreground uppercase mb-1">Yes Price</p>
+                  <p className="text-4xl font-bold" style={{ color: "hsl(var(--yes))" }}>
                     {Math.round(yesPrice * 100)}¢
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-slate-500 uppercase mb-1">No Price</p>
-                  <p className="text-4xl font-bold text-red-400">
+                  <p className="text-xs text-muted-foreground uppercase mb-1">No Price</p>
+                  <p className="text-4xl font-bold" style={{ color: "hsl(var(--no))" }}>
                     {Math.round(noPrice * 100)}¢
                   </p>
                 </div>
               </div>
 
               {/* Price bar */}
-              <div className="h-3 bg-red-500/20 rounded-full overflow-hidden">
+              <div className="h-3 bg-secondary rounded-full overflow-hidden flex">
                 <div
-                  className="h-full bg-gradient-to-r from-primary-500 to-primary-400 rounded-full transition-all"
-                  style={{ width: `${yesPrice * 100}%` }}
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${yesPrice * 100}%`, backgroundColor: "hsl(var(--yes))" }}
+                />
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${noPrice * 100}%`, backgroundColor: "hsl(var(--no))" }}
                 />
               </div>
             </div>
 
             {/* Market Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="glass rounded-xl p-4">
-                <p className="text-xs text-slate-500 mb-1">24h Volume</p>
-                <p className="text-lg font-semibold text-slate-200">
+              <div className="bg-card border border-border rounded-xl p-4">
+                <p className="text-xs text-muted-foreground mb-1">24h Volume</p>
+                <p className="text-lg font-semibold text-foreground">
                   {formatVolume(market.volume24h || market.volume)}
                 </p>
               </div>
-              <div className="glass rounded-xl p-4">
-                <p className="text-xs text-slate-500 mb-1">Total Volume</p>
-                <p className="text-lg font-semibold text-slate-200">
+              <div className="bg-card border border-border rounded-xl p-4">
+                <p className="text-xs text-muted-foreground mb-1">Total Volume</p>
+                <p className="text-lg font-semibold text-foreground">
                   {formatVolume(market.volume)}
                 </p>
               </div>
-              <div className="glass rounded-xl p-4">
-                <p className="text-xs text-slate-500 mb-1">Open Interest</p>
-                <p className="text-lg font-semibold text-slate-200">
+              <div className="bg-card border border-border rounded-xl p-4">
+                <p className="text-xs text-muted-foreground mb-1">Open Interest</p>
+                <p className="text-lg font-semibold text-foreground">
                   {formatVolume(market.openInterest || 0)}
                 </p>
               </div>
-              <div className="glass rounded-xl p-4">
-                <p className="text-xs text-slate-500 mb-1">Closes</p>
-                <p className="text-sm font-semibold text-slate-200">
+              <div className="bg-card border border-border rounded-xl p-4">
+                <p className="text-xs text-muted-foreground mb-1">Closes</p>
+                <p className="text-sm font-semibold text-foreground">
                   {formatDate(market.closeTime)}
                 </p>
               </div>
             </div>
 
             {/* How it works */}
-            <div className="glass rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-slate-300 mb-4">How gifting works</h3>
+            <div className="bg-card border border-border rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-foreground mb-4">How gifting works</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex gap-3">
-                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-500/10 text-primary-400 flex items-center justify-center text-sm font-bold">1</span>
+                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">1</span>
                   <div>
-                    <p className="text-sm text-slate-300 font-medium">Pick your position</p>
-                    <p className="text-xs text-slate-500">Choose YES or NO and how many shares</p>
+                    <p className="text-sm text-foreground font-medium">Pick your position</p>
+                    <p className="text-xs text-muted-foreground">Choose YES or NO and how many shares</p>
                   </div>
                 </div>
                 <div className="flex gap-3">
-                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-500/10 text-primary-400 flex items-center justify-center text-sm font-bold">2</span>
+                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">2</span>
                   <div>
-                    <p className="text-sm text-slate-300 font-medium">Add recipient</p>
-                    <p className="text-xs text-slate-500">Enter their email and a message</p>
+                    <p className="text-sm text-foreground font-medium">Add recipient</p>
+                    <p className="text-xs text-muted-foreground">Enter their email and a message</p>
                   </div>
                 </div>
                 <div className="flex gap-3">
-                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-500/10 text-primary-400 flex items-center justify-center text-sm font-bold">3</span>
+                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">3</span>
                   <div>
-                    <p className="text-sm text-slate-300 font-medium">They claim it</p>
-                    <p className="text-xs text-slate-500">They get an email with a link to claim</p>
+                    <p className="text-sm text-foreground font-medium">They claim it</p>
+                    <p className="text-xs text-muted-foreground">They get an email with a link to claim</p>
                   </div>
                 </div>
                 <div className="flex gap-3">
-                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-500/10 text-primary-400 flex items-center justify-center text-sm font-bold">4</span>
+                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">4</span>
                   <div>
-                    <p className="text-sm text-slate-300 font-medium">Win or cash out</p>
-                    <p className="text-xs text-slate-500">Hold until resolution or sell anytime</p>
+                    <p className="text-sm text-foreground font-medium">Win or cash out</p>
+                    <p className="text-xs text-muted-foreground">Hold until resolution or sell anytime</p>
                   </div>
                 </div>
               </div>
@@ -321,14 +325,14 @@ export default function MarketPage() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="lg:col-span-2"
           >
-            <div className="glass rounded-2xl p-5 sticky top-24">
-              <h2 className="text-lg font-bold mb-5 flex items-center gap-2">
+            <div className="bg-card border border-border rounded-2xl p-5 sticky top-24">
+              <h2 className="text-lg font-bold text-foreground mb-5 flex items-center gap-2">
                 <span>🎁</span> Gift This Market
               </h2>
 
               {/* Side picker */}
               <div className="mb-5">
-                <label className="block text-xs text-slate-500 uppercase tracking-wide mb-2">
+                <label className="block text-xs text-muted-foreground uppercase tracking-wide mb-2">
                   Position
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -336,9 +340,10 @@ export default function MarketPage() {
                     onClick={() => setSide("yes")}
                     className={`py-4 rounded-xl text-sm font-bold transition ${
                       side === "yes"
-                        ? "bg-primary-500/15 border-2 border-primary-500 text-primary-400"
-                        : "bg-slate-800/50 border-2 border-transparent text-slate-400 hover:border-slate-700"
+                        ? "bg-yes/15 border-2 text-yes"
+                        : "bg-secondary border-2 border-transparent text-muted-foreground hover:border-border"
                     }`}
+                    style={side === "yes" ? { borderColor: "hsl(var(--yes))" } : {}}
                   >
                     YES · {Math.round(yesPrice * 100)}¢
                   </button>
@@ -346,9 +351,10 @@ export default function MarketPage() {
                     onClick={() => setSide("no")}
                     className={`py-4 rounded-xl text-sm font-bold transition ${
                       side === "no"
-                        ? "bg-red-500/15 border-2 border-red-500 text-red-400"
-                        : "bg-slate-800/50 border-2 border-transparent text-slate-400 hover:border-slate-700"
+                        ? "bg-no/15 border-2 text-no"
+                        : "bg-secondary border-2 border-transparent text-muted-foreground hover:border-border"
                     }`}
+                    style={side === "no" ? { borderColor: "hsl(var(--no))" } : {}}
                   >
                     NO · {Math.round(noPrice * 100)}¢
                   </button>
@@ -357,22 +363,22 @@ export default function MarketPage() {
 
               {/* Shares picker */}
               <div className="mb-5">
-                <label className="block text-xs text-slate-500 uppercase tracking-wide mb-2">
+                <label className="block text-xs text-muted-foreground uppercase tracking-wide mb-2">
                   Shares
                 </label>
                 <div className="flex items-center justify-center gap-4 mb-3">
                   <button
                     onClick={() => setShares(Math.max(5, shares - 5))}
-                    className="w-12 h-12 rounded-xl bg-slate-800 text-slate-300 text-xl font-bold hover:bg-slate-700 transition"
+                    className="w-12 h-12 rounded-xl bg-secondary text-foreground text-xl font-bold hover:bg-secondary/80 transition"
                   >
                     −
                   </button>
-                  <span className="text-4xl font-bold text-slate-100 w-20 text-center font-mono">
+                  <span className="text-4xl font-bold text-foreground w-20 text-center font-mono">
                     {shares}
                   </span>
                   <button
                     onClick={() => setShares(shares + 5)}
-                    className="w-12 h-12 rounded-xl bg-slate-800 text-slate-300 text-xl font-bold hover:bg-slate-700 transition"
+                    className="w-12 h-12 rounded-xl bg-secondary text-foreground text-xl font-bold hover:bg-secondary/80 transition"
                   >
                     +
                   </button>
@@ -384,8 +390,8 @@ export default function MarketPage() {
                       onClick={() => setShares(n)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-mono transition ${
                         shares === n
-                          ? "bg-primary-500/20 text-primary-400 border border-primary-500/30"
-                          : "bg-slate-800/50 text-slate-500 hover:text-slate-300"
+                          ? "bg-primary/20 text-primary border border-primary/30"
+                          : "bg-secondary text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       {n}
@@ -396,7 +402,7 @@ export default function MarketPage() {
 
               {/* Recipient info */}
               <div className="mb-4">
-                <label className="block text-xs text-slate-500 uppercase tracking-wide mb-2">
+                <label className="block text-xs text-muted-foreground uppercase tracking-wide mb-2">
                   Recipient&apos;s Name
                 </label>
                 <Input
@@ -408,7 +414,7 @@ export default function MarketPage() {
               </div>
 
               <div className="mb-4">
-                <label className="block text-xs text-slate-500 uppercase tracking-wide mb-2">
+                <label className="block text-xs text-muted-foreground uppercase tracking-wide mb-2">
                   Recipient&apos;s Email *
                 </label>
                 <Input
@@ -420,7 +426,7 @@ export default function MarketPage() {
               </div>
 
               <div className="mb-5">
-                <label className="block text-xs text-slate-500 uppercase tracking-wide mb-2">
+                <label className="block text-xs text-muted-foreground uppercase tracking-wide mb-2">
                   Gift Message
                 </label>
                 <Textarea
@@ -432,35 +438,35 @@ export default function MarketPage() {
               </div>
 
               {/* Cost summary */}
-              <div className="bg-slate-800/30 rounded-xl p-4 mb-4">
+              <div className="bg-secondary/50 rounded-xl p-4 mb-4">
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-slate-500">
+                  <span className="text-muted-foreground">
                     {shares} shares × {Math.round(selectedPrice * 100)}¢
                   </span>
-                  <span className="text-slate-300">${cost}</span>
+                  <span className="text-foreground">${cost}</span>
                 </div>
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-slate-500">Platform fee</span>
-                  <span className="text-primary-400">Free (beta)</span>
+                  <span className="text-muted-foreground">Platform fee</span>
+                  <span className="text-primary">Free (beta)</span>
                 </div>
-                <div className="flex justify-between text-sm pt-2 border-t border-slate-700/50">
-                  <span className="text-slate-300 font-semibold">Total</span>
-                  <span className={`font-bold text-xl ${isBelowMinimum ? "text-amber-400" : "text-slate-100"}`}>${cost}</span>
+                <div className="flex justify-between text-sm pt-2 border-t border-border">
+                  <span className="text-foreground font-semibold">Total</span>
+                  <span className={`font-bold text-xl ${isBelowMinimum ? "text-amber-500" : "text-foreground"}`}>${cost}</span>
                 </div>
                 {isBelowMinimum && (
-                  <p className="text-xs text-amber-400 mt-2">
+                  <p className="text-xs text-amber-500 mt-2">
                     Minimum order is ${MIN_ORDER_AMOUNT.toFixed(2)}
                   </p>
                 )}
-                <div className="flex justify-between text-xs mt-3 pt-2 border-t border-slate-700/30">
-                  <span className="text-slate-600">If {side.toUpperCase()} wins</span>
-                  <span className="text-accent-400 font-bold">${potentialPayout} payout</span>
+                <div className="flex justify-between text-xs mt-3 pt-2 border-t border-border">
+                  <span className="text-muted-foreground">If {side.toUpperCase()} wins</span>
+                  <span className="text-accent font-bold">${potentialPayout} payout</span>
                 </div>
               </div>
 
               {checkoutError && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 mb-4">
-                  <p className="text-xs text-red-400">{checkoutError}</p>
+                <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 mb-4">
+                  <p className="text-xs text-destructive">{checkoutError}</p>
                 </div>
               )}
 
@@ -483,7 +489,7 @@ export default function MarketPage() {
                 )}
               </Button>
 
-              <p className="text-[10px] text-slate-600 text-center mt-3">
+              <p className="text-[10px] text-muted-foreground text-center mt-3">
                 Pay with card · Recipient claims via email · No wallet needed
               </p>
             </div>
