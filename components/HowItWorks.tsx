@@ -24,8 +24,8 @@ const steps = [
     ),
   },
   {
-    title: "They Win (or Lose!)",
-    description: "If the prediction is right, your friend gets paid out. It's the most fun gift they'll ever open.",
+    title: "They Win (or Cash Out!)",
+    description: "If the prediction is right, your friend gets paid out. Or they can cash out anytime at market price.",
     accent: "primary",
     icon: (
       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
