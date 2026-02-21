@@ -5,7 +5,7 @@ import { MarketSearch } from "@/components/MarketSearch";
 
 export function HeroSection() {
   return (
-    <section className="relative flex min-h-[50vh] items-center justify-center overflow-hidden pt-16">
+    <section className="relative flex min-h-[50vh] items-center justify-center pt-16 pb-32">
       {/* Background gradient */}
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-background to-background" />
@@ -43,7 +43,7 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="mx-auto mt-10 max-w-2xl"
+          className="relative z-50 mx-auto mt-10 max-w-2xl"
         >
           <MarketSearch
             placeholder="Search any Kalshi market... (e.g., Super Bowl, Bitcoin, Elections)"
