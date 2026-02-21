@@ -54,7 +54,7 @@ export function HowItWorks() {
             How it Works
           </span>
           <h2 className="text-3xl font-bold tracking-tight md:text-4xl">
-            Gift a future in <span className="text-gradient-brand">three easy steps</span>
+            Gift a prediction in <span className="text-gradient-brand">three easy steps</span>
           </h2>
         </motion.div>
 
