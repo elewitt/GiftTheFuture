@@ -448,26 +448,26 @@ export default function DashboardPage() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-950 to-slate-900">
-        <div className="w-8 h-8 border-2 border-primary-500/20 border-t-primary-500 rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
       </div>
     );
   }
 
   if (!authenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-5 bg-gradient-to-b from-slate-950 to-slate-900">
+      <div className="min-h-screen flex items-center justify-center px-5 bg-background">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="text-center max-w-sm"
         >
-          <div className="w-20 h-20 rounded-2xl bg-gradient-brand-subtle flex items-center justify-center mx-auto mb-6">
+          <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
             <span className="text-4xl">📊</span>
           </div>
-          <h1 className="text-2xl font-bold mb-3 text-slate-100">Your Dashboard</h1>
-          <p className="text-sm text-slate-500 mb-8">
+          <h1 className="text-2xl font-bold mb-3 text-foreground">Your Dashboard</h1>
+          <p className="text-sm text-muted-foreground mb-8">
             Sign in to see your prediction market positions, track your gifts, and cash out anytime.
           </p>
           <Button onClick={login} size="lg" className="w-full">
@@ -479,7 +479,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900">
+    <div className="min-h-screen bg-background">
       <Navbar />
 
       <div className="pt-24 max-w-5xl mx-auto px-5 pb-20">
@@ -524,15 +524,15 @@ export default function DashboardPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="mb-6 p-5 rounded-2xl bg-gradient-to-br from-primary-500/5 to-accent-500/5 border border-primary-500/20"
+            className="mb-6 p-5 rounded-2xl bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/20"
           >
             <div className="flex items-center justify-between mb-4">
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Wallet Balance</p>
-                <p className="text-2xl font-bold text-primary-400">
-                  ${usdcBalance !== null ? usdcBalance.toFixed(2) : "—"} <span className="text-base font-normal text-slate-500">USDC</span>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Wallet Balance</p>
+                <p className="text-2xl font-bold text-primary">
+                  ${usdcBalance !== null ? usdcBalance.toFixed(2) : "—"} <span className="text-base font-normal text-muted-foreground">USDC</span>
                 </p>
-                <p className="text-xs text-slate-600 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {solBalance !== null ? `${solBalance.toFixed(4)} SOL for fees` : "Loading..."}
                 </p>
               </div>
@@ -544,9 +544,9 @@ export default function DashboardPage() {
                 Withdraw USDC
               </Button>
             </div>
-            <div className="pt-3 border-t border-slate-800/50">
-              <p className="text-[10px] text-slate-600 mb-1">Your wallet address</p>
-              <p className="text-xs text-slate-400 font-mono break-all">
+            <div className="pt-3 border-t border-border">
+              <p className="text-[10px] text-muted-foreground mb-1">Your wallet address</p>
+              <p className="text-xs text-foreground font-mono break-all">
                 {wallets.find((w) => w.walletClientType === "privy")?.address || wallets[0]?.address}
               </p>
             </div>
@@ -559,15 +559,15 @@ export default function DashboardPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.15 }}
-            className="mb-6 p-4 rounded-xl bg-gradient-to-r from-accent-500/10 to-accent-600/10 border border-accent-500/20"
+            className="mb-6 p-4 rounded-xl bg-gradient-to-r from-accent/10 to-accent/5 border border-accent/20"
           >
             <div className="flex items-center gap-3">
               <span className="text-2xl">🎁</span>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-accent-200">
+                <p className="text-sm font-semibold text-foreground">
                   You have {data.pending.length} gift{data.pending.length > 1 ? "s" : ""} waiting!
                 </p>
-                <p className="text-xs text-accent-200/60">
+                <p className="text-xs text-muted-foreground">
                   Click the Pending tab to claim your positions.
                 </p>
               </div>
@@ -587,7 +587,7 @@ export default function DashboardPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="flex gap-1 p-1 bg-slate-900/50 rounded-xl mb-6 w-fit"
+          className="flex gap-1 p-1 bg-secondary/50 rounded-xl mb-6 w-fit"
         >
           <TabButton
             active={activeTab === "positions"}
@@ -616,13 +616,13 @@ export default function DashboardPage() {
         {/* Content */}
         {loading ? (
           <div className="py-20 text-center">
-            <div className="w-8 h-8 border-2 border-primary-500/20 border-t-primary-500 rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-sm text-slate-500">Loading your dashboard...</p>
+            <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-sm text-muted-foreground">Loading your dashboard...</p>
           </div>
         ) : error ? (
           <div className="py-20 text-center">
-            <p className="text-red-400 mb-2">Failed to load dashboard</p>
-            <p className="text-xs text-slate-600">{error}</p>
+            <p className="text-destructive mb-2">Failed to load dashboard</p>
+            <p className="text-xs text-muted-foreground">{error}</p>
           </div>
         ) : (
           <>
@@ -678,26 +678,26 @@ function SummaryCard({
   color: "primary" | "accent" | "emerald" | "red" | "violet";
 }) {
   const colorClasses = {
-    primary: "from-primary-500/10 to-primary-500/5 border-primary-500/20",
-    accent: "from-accent-500/10 to-accent-500/5 border-accent-500/20",
+    primary: "from-primary/10 to-primary/5 border-primary/20",
+    accent: "from-amber-500/10 to-amber-500/5 border-amber-500/20",
     emerald: "from-emerald-500/10 to-emerald-500/5 border-emerald-500/20",
     red: "from-red-500/10 to-red-500/5 border-red-500/20",
     violet: "from-violet-500/10 to-violet-500/5 border-violet-500/20",
   };
 
   const textColors = {
-    primary: "text-primary-400",
-    accent: "text-accent-400",
-    emerald: "text-emerald-400",
-    red: "text-red-400",
-    violet: "text-violet-400",
+    primary: "text-primary",
+    accent: "text-amber-600",
+    emerald: "text-emerald-600",
+    red: "text-red-600",
+    violet: "text-violet-600",
   };
 
   return (
     <div className={`p-4 rounded-xl bg-gradient-to-br ${colorClasses[color]} border`}>
-      <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">{label}</p>
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
       <p className={`text-xl font-bold ${textColors[color]}`}>{value}</p>
-      <p className="text-[10px] text-slate-600 mt-1">{subtext}</p>
+      <p className="text-[10px] text-muted-foreground mt-1">{subtext}</p>
     </div>
   );
 }
@@ -720,8 +720,8 @@ function TabButton({
       onClick={onClick}
       className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${
         active
-          ? "bg-slate-800 text-white"
-          : "text-slate-500 hover:text-slate-300"
+          ? "bg-card text-foreground shadow-sm"
+          : "text-muted-foreground hover:text-foreground"
       }`}
     >
       {children}
@@ -729,10 +729,10 @@ function TabButton({
         <span
           className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
             highlight
-              ? "bg-accent-500/20 text-accent-400"
+              ? "bg-accent/20 text-amber-600"
               : active
-              ? "bg-slate-700 text-slate-300"
-              : "bg-slate-800/50 text-slate-500"
+              ? "bg-secondary text-muted-foreground"
+              : "bg-secondary/50 text-muted-foreground"
           }`}
         >
           {count}
@@ -746,11 +746,11 @@ function PositionsTab({ positions, onCashout }: { positions: Position[]; onCasho
   if (positions.length === 0) {
     return (
       <div className="py-16 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-slate-800/50 flex items-center justify-center mx-auto mb-4">
+        <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-4">
           <span className="text-3xl">📭</span>
         </div>
-        <h3 className="text-lg font-semibold text-slate-300 mb-2">No positions yet</h3>
-        <p className="text-sm text-slate-600 max-w-sm mx-auto mb-6">
+        <h3 className="text-lg font-semibold text-foreground mb-2">No positions yet</h3>
+        <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
           When someone sends you a prediction market gift and you claim it, your position will appear here.
         </p>
         <Link href="/">
@@ -777,7 +777,7 @@ function PositionCard({ position, onCashout }: { position: Position; onCashout: 
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-5 rounded-2xl glass"
+      className="p-5 rounded-2xl bg-card border border-border"
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
@@ -785,23 +785,23 @@ function PositionCard({ position, onCashout }: { position: Position; onCashout: 
             <span
               className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                 position.side === "yes"
-                  ? "bg-primary-500/10 text-primary-400"
-                  : "bg-red-500/10 text-red-400"
+                  ? "bg-yes/10 text-yes"
+                  : "bg-no/10 text-no"
               }`}
             >
               {position.side}
             </span>
-            <span className="text-[10px] text-slate-600">
+            <span className="text-[10px] text-muted-foreground">
               {position.marketStatus === "open" ? "🟢 Active" : "⚪ " + position.marketStatus}
             </span>
           </div>
-          <h3 className="text-sm font-semibold text-slate-200 leading-snug">
+          <h3 className="text-sm font-semibold text-foreground leading-snug">
             {position.marketTitle}
           </h3>
         </div>
         <div className="text-right">
-          <p className="text-lg font-bold text-slate-100">${position.currentValue.toFixed(2)}</p>
-          <p className={`text-xs font-medium ${isProfit ? "text-emerald-400" : "text-red-400"}`}>
+          <p className="text-lg font-bold text-foreground">${position.currentValue.toFixed(2)}</p>
+          <p className={`text-xs font-medium ${isProfit ? "text-emerald-600" : "text-red-600"}`}>
             {isProfit ? "+" : ""}${position.profitLoss.toFixed(2)}
           </p>
         </div>
@@ -809,15 +809,19 @@ function PositionCard({ position, onCashout }: { position: Position; onCashout: 
 
       {/* Price Bar */}
       <div className="mb-4">
-        <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+        <div className="h-2 bg-secondary rounded-full overflow-hidden flex">
           <div
-            className="h-full bg-gradient-to-r from-primary-500 to-primary-400 rounded-full transition-all"
-            style={{ width: `${pricePercent}%` }}
+            className="h-full rounded-full transition-all"
+            style={{ width: `${pricePercent}%`, backgroundColor: "hsl(var(--yes))" }}
+          />
+          <div
+            className="h-full rounded-full transition-all"
+            style={{ width: `${100 - pricePercent}%`, backgroundColor: "hsl(var(--no))" }}
           />
         </div>
         <div className="flex justify-between text-[10px] mt-1">
-          <span className="text-primary-400">Yes {pricePercent}¢</span>
-          <span className="text-red-400">No {100 - pricePercent}¢</span>
+          <span style={{ color: "hsl(var(--yes))" }}>Yes {pricePercent}¢</span>
+          <span style={{ color: "hsl(var(--no))" }}>No {100 - pricePercent}¢</span>
         </div>
       </div>
 
@@ -830,7 +834,7 @@ function PositionCard({ position, onCashout }: { position: Position; onCashout: 
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2 mt-4 pt-4 border-t border-slate-800/50">
+      <div className="flex gap-2 mt-4 pt-4 border-t border-border">
         <Button variant="secondary" size="sm" className="flex-1">
           Hold Position
         </Button>
@@ -850,8 +854,8 @@ function PositionCard({ position, onCashout }: { position: Position; onCashout: 
 function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div>
-      <p className="text-[10px] text-slate-600 uppercase">{label}</p>
-      <p className={`text-sm font-semibold ${highlight ? "text-accent-400" : "text-slate-200"}`}>
+      <p className="text-[10px] text-muted-foreground uppercase">{label}</p>
+      <p className={`text-sm font-semibold ${highlight ? "text-amber-600" : "text-foreground"}`}>
         {value}
       </p>
     </div>
@@ -862,11 +866,11 @@ function SentTab({ gifts }: { gifts: SentGift[] }) {
   if (gifts.length === 0) {
     return (
       <div className="py-16 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-slate-800/50 flex items-center justify-center mx-auto mb-4">
+        <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-4">
           <span className="text-3xl">🎁</span>
         </div>
-        <h3 className="text-lg font-semibold text-slate-300 mb-2">No gifts sent yet</h3>
-        <p className="text-sm text-slate-600 max-w-sm mx-auto mb-6">
+        <h3 className="text-lg font-semibold text-foreground mb-2">No gifts sent yet</h3>
+        <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
           Send someone a prediction market position as a gift. They'll receive an email with a link to claim it.
         </p>
         <Link href="/">
@@ -887,10 +891,10 @@ function SentTab({ gifts }: { gifts: SentGift[] }) {
 
 function SentGiftCard({ gift }: { gift: SentGift }) {
   const statusColors: Record<string, string> = {
-    pending_claim: "bg-accent-500/10 text-accent-400",
-    claimed: "bg-primary-500/10 text-primary-400",
-    cashed_out: "bg-blue-500/10 text-blue-400",
-    settled: "bg-slate-500/10 text-slate-400",
+    pending_claim: "bg-amber-500/10 text-amber-600",
+    claimed: "bg-primary/10 text-primary",
+    cashed_out: "bg-blue-500/10 text-blue-600",
+    settled: "bg-secondary text-muted-foreground",
   };
 
   const statusLabels: Record<string, string> = {
@@ -901,25 +905,25 @@ function SentGiftCard({ gift }: { gift: SentGift }) {
   };
 
   return (
-    <div className="p-4 rounded-xl glass">
+    <div className="p-4 rounded-xl bg-card border border-border">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${statusColors[gift.status] || "bg-slate-500/10 text-slate-400"}`}>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${statusColors[gift.status] || "bg-secondary text-muted-foreground"}`}>
               {statusLabels[gift.status] || gift.status}
             </span>
-            <span className="text-[10px] text-slate-600">
+            <span className="text-[10px] text-muted-foreground">
               {new Date(gift.createdAt).toLocaleDateString()}
             </span>
           </div>
-          <p className="text-sm font-medium text-slate-300 mb-1">{gift.marketTitle}</p>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm font-medium text-foreground mb-1">{gift.marketTitle}</p>
+          <p className="text-xs text-muted-foreground">
             To: {gift.recipientName || gift.recipientContact}
           </p>
         </div>
         <div className="text-right">
-          <p className="text-sm font-semibold text-slate-200">${gift.costUSDC.toFixed(2)}</p>
-          <p className="text-[10px] text-slate-500">{gift.shares.toFixed(1)} shares</p>
+          <p className="text-sm font-semibold text-foreground">${gift.costUSDC.toFixed(2)}</p>
+          <p className="text-[10px] text-muted-foreground">{gift.shares.toFixed(1)} shares</p>
         </div>
       </div>
     </div>
@@ -930,11 +934,11 @@ function PendingTab({ gifts }: { gifts: PendingGift[] }) {
   if (gifts.length === 0) {
     return (
       <div className="py-16 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-slate-800/50 flex items-center justify-center mx-auto mb-4">
+        <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-4">
           <span className="text-3xl">✅</span>
         </div>
-        <h3 className="text-lg font-semibold text-slate-300 mb-2">All caught up!</h3>
-        <p className="text-sm text-slate-600 max-w-sm mx-auto">
+        <h3 className="text-lg font-semibold text-foreground mb-2">All caught up!</h3>
+        <p className="text-sm text-muted-foreground max-w-sm mx-auto">
           You don't have any pending gifts to claim.
         </p>
       </div>
@@ -955,40 +959,40 @@ function PendingGiftCard({ gift }: { gift: PendingGift }) {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-5 rounded-2xl bg-gradient-to-br from-accent-500/5 to-accent-600/5 border border-accent-500/20"
+      className="p-5 rounded-2xl bg-gradient-to-br from-accent/5 to-accent/10 border border-accent/20"
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-lg">🎁</span>
-            <span className="text-[10px] text-accent-400 font-medium uppercase tracking-wider">
+            <span className="text-[10px] text-amber-600 font-medium uppercase tracking-wider">
               New Gift!
             </span>
           </div>
-          <h3 className="text-sm font-semibold text-slate-200">{gift.marketTitle}</h3>
+          <h3 className="text-sm font-semibold text-foreground">{gift.marketTitle}</h3>
           {gift.giftMessage && (
-            <p className="text-xs text-slate-500 mt-1 italic">&quot;{gift.giftMessage}&quot;</p>
+            <p className="text-xs text-muted-foreground mt-1 italic">&quot;{gift.giftMessage}&quot;</p>
           )}
         </div>
         <div className="text-right">
-          <p className="text-lg font-bold text-accent-400">${gift.potentialPayout.toFixed(2)}</p>
-          <p className="text-[10px] text-slate-500">if {gift.side.toUpperCase()} wins</p>
+          <p className="text-lg font-bold text-amber-600">${gift.potentialPayout.toFixed(2)}</p>
+          <p className="text-[10px] text-muted-foreground">if {gift.side.toUpperCase()} wins</p>
         </div>
       </div>
 
-      <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/50 mb-4">
+      <div className="flex items-center justify-between p-3 rounded-xl bg-secondary/50 mb-4">
         <div>
-          <p className="text-[10px] text-slate-500">Position</p>
-          <p className="text-sm font-semibold text-slate-200">
+          <p className="text-[10px] text-muted-foreground">Position</p>
+          <p className="text-sm font-semibold text-foreground">
             {gift.shares.toFixed(1)} x{" "}
-            <span className={gift.side === "yes" ? "text-primary-400" : "text-red-400"}>
+            <span style={{ color: gift.side === "yes" ? "hsl(var(--yes))" : "hsl(var(--no))" }}>
               {gift.side.toUpperCase()}
             </span>
           </p>
         </div>
         <div className="text-right">
-          <p className="text-[10px] text-slate-500">Current Value</p>
-          <p className="text-sm font-semibold text-slate-200">${gift.currentValue.toFixed(2)}</p>
+          <p className="text-[10px] text-muted-foreground">Current Value</p>
+          <p className="text-sm font-semibold text-foreground">${gift.currentValue.toFixed(2)}</p>
         </div>
       </div>
 
@@ -1019,40 +1023,40 @@ function CashoutModal({
         return (
           <>
             <div className="text-center mb-6">
-              <div className="w-16 h-16 rounded-2xl bg-primary-500/10 flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">💰</span>
               </div>
-              <h3 className="text-xl font-bold text-slate-100 mb-2">Cash Out Position</h3>
-              <p className="text-sm text-slate-500">
+              <h3 className="text-xl font-bold text-foreground mb-2">Cash Out Position</h3>
+              <p className="text-sm text-muted-foreground">
                 Sell your shares and receive USDC to your wallet
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-800/50 mb-4">
-              <p className="text-xs text-slate-500 mb-1">Position</p>
-              <p className="text-sm font-medium text-slate-200 mb-3">{position.marketTitle}</p>
+            <div className="p-4 rounded-xl bg-secondary/50 mb-4">
+              <p className="text-xs text-muted-foreground mb-1">Position</p>
+              <p className="text-sm font-medium text-foreground mb-3">{position.marketTitle}</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-slate-500">Shares</p>
-                  <p className="text-sm font-semibold text-slate-200">
+                  <p className="text-xs text-muted-foreground">Shares</p>
+                  <p className="text-sm font-semibold text-foreground">
                     {position.shares.toFixed(2)} {position.side.toUpperCase()}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Current Price</p>
-                  <p className="text-sm font-semibold text-slate-200">{pricePercent}¢</p>
+                  <p className="text-xs text-muted-foreground">Current Price</p>
+                  <p className="text-sm font-semibold text-foreground">{pricePercent}¢</p>
                 </div>
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-primary-500/10 border border-primary-500/20 mb-6">
+            <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 mb-6">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-primary-400">You will receive</span>
-                <span className="text-xl font-bold text-primary-400">
+                <span className="text-sm text-primary">You will receive</span>
+                <span className="text-xl font-bold text-primary">
                   ~${position.currentValue.toFixed(2)} USDC
                 </span>
               </div>
-              <p className="text-[10px] text-primary-400/60 mt-1">
+              <p className="text-[10px] text-primary/60 mt-1">
                 Final amount may vary slightly based on market conditions
               </p>
             </div>
@@ -1073,11 +1077,11 @@ function CashoutModal({
       case "confirming":
         return (
           <div className="text-center py-8">
-            <div className="w-12 h-12 border-2 border-primary-500/20 border-t-primary-500 rounded-full animate-spin mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-slate-100 mb-2">
+            <div className="w-12 h-12 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-foreground mb-2">
               {cashout.step === "signing" ? "Preparing Transaction" : cashout.step === "sending" ? "Sign Transaction" : "Confirming Transaction"}
             </h3>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               {cashout.step === "signing" ? "Creating your sell order..." : cashout.step === "sending" ? "Please approve in your wallet" : "Waiting for blockchain confirmation..."}
             </p>
             {cashout.signature && (
@@ -1085,7 +1089,7 @@ function CashoutModal({
                 href={`https://solscan.io/tx/${cashout.signature}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-primary-400 hover:text-primary-300 mt-4 inline-block"
+                className="text-xs text-primary hover:text-primary/80 mt-4 inline-block"
               >
                 View on Solscan →
               </a>
@@ -1096,12 +1100,12 @@ function CashoutModal({
       case "done":
         return (
           <div className="text-center py-8">
-            <div className="w-16 h-16 rounded-2xl bg-primary-500/10 flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
               <span className="text-3xl">✅</span>
             </div>
-            <h3 className="text-xl font-bold text-slate-100 mb-2">Cash Out Complete!</h3>
-            <p className="text-sm text-slate-500 mb-4">
-              You received <span className="text-primary-400 font-semibold">${cashout.usdcReceived?.toFixed(2)} USDC</span>
+            <h3 className="text-xl font-bold text-foreground mb-2">Cash Out Complete!</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              You received <span className="text-primary font-semibold">${cashout.usdcReceived?.toFixed(2)} USDC</span>
             </p>
             {cashout.signature && (
               <a
@@ -1115,18 +1119,18 @@ function CashoutModal({
                 </Button>
               </a>
             )}
-            <p className="text-xs text-slate-600 mt-4">Refreshing dashboard...</p>
+            <p className="text-xs text-muted-foreground mt-4">Refreshing dashboard...</p>
           </div>
         );
 
       case "error":
         return (
           <div className="text-center py-8">
-            <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
               <span className="text-3xl">❌</span>
             </div>
-            <h3 className="text-xl font-bold text-slate-100 mb-2">Cash Out Failed</h3>
-            <p className="text-sm text-red-400 mb-6">{cashout.error}</p>
+            <h3 className="text-xl font-bold text-foreground mb-2">Cash Out Failed</h3>
+            <p className="text-sm text-destructive mb-6">{cashout.error}</p>
             <div className="flex gap-3">
               <Button onClick={onClose} variant="secondary" className="flex-1">
                 Close
@@ -1143,18 +1147,18 @@ function CashoutModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={cashout.step === "confirm" || cashout.step === "error" || cashout.step === "done" ? onClose : undefined}
       />
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl"
+        className="relative w-full max-w-md bg-card border border-border rounded-2xl p-6 shadow-2xl"
       >
         {(cashout.step === "confirm" || cashout.step === "error" || cashout.step === "done") && (
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-1 text-slate-600 hover:text-slate-400 transition"
+            className="absolute top-4 right-4 p-1 text-muted-foreground hover:text-foreground transition"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1188,17 +1192,17 @@ function WithdrawModal({
         return (
           <>
             <div className="text-center mb-6">
-              <div className="w-16 h-16 rounded-2xl bg-primary-500/10 flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">💸</span>
               </div>
-              <h3 className="text-xl font-bold text-slate-100 mb-2">Withdraw USDC</h3>
-              <p className="text-sm text-slate-500">
+              <h3 className="text-xl font-bold text-foreground mb-2">Withdraw USDC</h3>
+              <p className="text-sm text-muted-foreground">
                 Send USDC to any Solana wallet
               </p>
             </div>
 
             <div className="mb-4">
-              <label className="block text-xs text-slate-500 uppercase tracking-wide mb-2">
+              <label className="block text-xs text-muted-foreground uppercase tracking-wide mb-2">
                 Destination Wallet Address
               </label>
               <Input
@@ -1211,7 +1215,7 @@ function WithdrawModal({
             </div>
 
             <div className="mb-4">
-              <label className="block text-xs text-slate-500 uppercase tracking-wide mb-2">
+              <label className="block text-xs text-muted-foreground uppercase tracking-wide mb-2">
                 Amount (USDC)
               </label>
               <div className="relative">
@@ -1226,18 +1230,18 @@ function WithdrawModal({
                 />
                 <button
                   onClick={() => onAmountChange(usdcBalance.toFixed(2))}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-primary-500/20 text-primary-400 text-xs font-medium hover:bg-primary-500/30 transition"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-primary/20 text-primary text-xs font-medium hover:bg-primary/30 transition"
                 >
                   MAX
                 </button>
               </div>
-              <p className="text-xs text-slate-600 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Available: ${usdcBalance.toFixed(2)} USDC
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-accent-500/10 border border-accent-500/20 mb-6">
-              <p className="text-xs text-accent-400">
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-6">
+              <p className="text-xs text-amber-600">
                 <strong>Note:</strong> You'll need a small amount of SOL in your wallet to pay for transaction fees (~0.001 SOL).
               </p>
             </div>
@@ -1262,11 +1266,11 @@ function WithdrawModal({
       case "sending":
         return (
           <div className="text-center py-8">
-            <div className="w-12 h-12 border-2 border-primary-500/20 border-t-primary-500 rounded-full animate-spin mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-slate-100 mb-2">
+            <div className="w-12 h-12 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-foreground mb-2">
               {withdraw.step === "confirming" ? "Preparing Transaction" : "Sign Transaction"}
             </h3>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               {withdraw.step === "confirming" ? "Building your withdrawal..." : "Please approve in your wallet..."}
             </p>
           </div>
@@ -1275,12 +1279,12 @@ function WithdrawModal({
       case "done":
         return (
           <div className="text-center py-8">
-            <div className="w-16 h-16 rounded-2xl bg-primary-500/10 flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
               <span className="text-3xl">✅</span>
             </div>
-            <h3 className="text-xl font-bold text-slate-100 mb-2">Withdrawal Complete!</h3>
-            <p className="text-sm text-slate-500 mb-4">
-              Sent <span className="text-primary-400 font-semibold">${withdraw.amount} USDC</span>
+            <h3 className="text-xl font-bold text-foreground mb-2">Withdrawal Complete!</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Sent <span className="text-primary font-semibold">${withdraw.amount} USDC</span>
             </p>
             {withdraw.signature && (
               <a
@@ -1303,11 +1307,11 @@ function WithdrawModal({
       case "error":
         return (
           <div className="text-center py-8">
-            <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
               <span className="text-3xl">❌</span>
             </div>
-            <h3 className="text-xl font-bold text-slate-100 mb-2">Withdrawal Failed</h3>
-            <p className="text-sm text-red-400 mb-6">{withdraw.error}</p>
+            <h3 className="text-xl font-bold text-foreground mb-2">Withdrawal Failed</h3>
+            <p className="text-sm text-destructive mb-6">{withdraw.error}</p>
             <div className="flex gap-3">
               <Button onClick={onClose} variant="secondary" className="flex-1">
                 Close
@@ -1324,18 +1328,18 @@ function WithdrawModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={withdraw.step === "form" || withdraw.step === "error" || withdraw.step === "done" ? onClose : undefined}
       />
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl"
+        className="relative w-full max-w-md bg-card border border-border rounded-2xl p-6 shadow-2xl"
       >
         {(withdraw.step === "form" || withdraw.step === "error" || withdraw.step === "done") && (
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-1 text-slate-600 hover:text-slate-400 transition"
+            className="absolute top-4 right-4 p-1 text-muted-foreground hover:text-foreground transition"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
