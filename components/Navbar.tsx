@@ -26,10 +26,16 @@ export function Navbar() {
         </Link>
 
         <div className="hidden items-center gap-6 md:flex">
-          <a href="#how-it-works" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+          <a
+            href="/#how-it-works"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
             How it Works
           </a>
-          <a href="#markets" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+          <a
+            href="/#markets"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
             Markets
           </a>
           <Link href="/dashboard" className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">

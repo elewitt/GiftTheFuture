@@ -97,16 +97,23 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
     demoMode: isDemoMode,
   });
 
+  // Token amount is stored in raw units (6 decimals)
+  // e.g., 10 shares = 10,000,000 raw units
+  const TOKEN_DECIMALS = 6;
+  const sharesNum = parseFloat(shares) || 10;
+
   try {
     let outputMint = "demo-mint-" + Date.now();
     let purchaseTxSig = "demo-tx-" + Date.now();
-    let tokensReceived = parseInt(shares) || 10;
+    // Initialize with raw token units (shares * 10^6)
+    let tokensReceived = Math.floor(sharesNum * Math.pow(10, TOKEN_DECIMALS));
 
     if (isDemoMode) {
       // ─── DEMO MODE: Simulate the purchase ───────────────────
       console.log("[Webhook] ⚠️ DEMO MODE ACTIVE - Simulating DFlow purchase (no real transaction)");
       console.log("[Webhook] To enable real purchases, set DEMO_MODE=false in Vercel env vars");
-      
+      console.log("[Webhook] Shares:", sharesNum, "-> Raw tokens:", tokensReceived);
+
       // Try to get real mint addresses for display purposes
       try {
         const mints = await getOutcomeMints(marketTicker);
@@ -114,10 +121,10 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
       } catch {
         outputMint = `demo-${side}-mint-${marketTicker}`;
       }
-      
+
       // Simulate some processing time
       await new Promise((r) => setTimeout(r, 1000));
-      
+
     } else {
       // ─── PRODUCTION MODE: Real DFlow purchase ───────────────
       console.log("[Webhook] 🚀 PRODUCTION MODE - Executing real DFlow purchase");
@@ -154,11 +161,17 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
         await confirmTransaction(purchaseTxSig);
         console.log("[Webhook] ✅ Transaction confirmed:", purchaseTxSig);
 
-        tokensReceived = Number(orderResponse.outAmount || shares);
+        // outAmount from DFlow is already in raw token units (6 decimals)
+        const rawOutAmount = Number(orderResponse.outAmount);
+        if (rawOutAmount > 0) {
+          tokensReceived = rawOutAmount;
+        }
+        console.log("[Webhook] Tokens received (raw):", tokensReceived);
       } catch (txErr: any) {
         console.error("[Webhook] ❌ DFlow transaction failed:", txErr.message || txErr);
         console.error("[Webhook] Full error:", JSON.stringify(txErr, null, 2));
         // Continue to create gift record even if tx failed - it will be in failed state
+        // tokensReceived stays at the initialized value (sharesNum * 10^6)
         purchaseTxSig = "FAILED-" + Date.now();
       }
     }
@@ -196,6 +209,8 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
 
     try {
       console.log("[Webhook] Calling email API at:", `${apiBase}/api/email/send`);
+      // For email, use display amount (human-readable shares)
+      const displayShares = tokensReceived / Math.pow(10, TOKEN_DECIMALS);
       const emailRes = await fetch(`${apiBase}/api/email/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -205,7 +220,7 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
           senderName: senderEmail?.split("@")[0] || "A friend",
           marketTitle,
           side,
-          shares: tokensReceived,
+          shares: displayShares,
           giftMessage,
           claimUrl,
         }),

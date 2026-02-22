@@ -214,12 +214,29 @@ export default function DashboardPage() {
 
       // Step 1: Ensure user has SOL for gas fees (airdrop if needed)
       try {
-        await fetch("/api/solana/airdrop-sol", {
+        const airdropRes = await fetch("/api/solana/airdrop-sol", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userAddress: wallet.address }),
         });
-      } catch (airdropErr) {
+        const airdropData = await airdropRes.json();
+
+        if (!airdropRes.ok) {
+          console.error("Airdrop failed:", airdropData.error);
+          // If airdrop failed due to fee payer being empty, show user-friendly error
+          if (airdropData.error?.includes("Fee payer wallet needs more SOL")) {
+            throw new Error("Service temporarily unavailable. Please try again later or contact support.");
+          }
+        } else if (airdropData.signature) {
+          // Wait a moment for the airdrop transaction to be confirmed
+          console.log("Airdrop sent, waiting for confirmation...", airdropData.signature);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      } catch (airdropErr: any) {
+        // If it's our thrown error, re-throw it
+        if (airdropErr.message?.includes("Service temporarily unavailable")) {
+          throw airdropErr;
+        }
         console.log("Airdrop skipped or failed, continuing anyway:", airdropErr);
       }
 
@@ -395,12 +412,26 @@ export default function DashboardPage() {
 
       // Ensure user has SOL for gas fees (airdrop if needed)
       try {
-        await fetch("/api/solana/airdrop-sol", {
+        const airdropRes = await fetch("/api/solana/airdrop-sol", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userAddress: wallet.address }),
         });
-      } catch (airdropErr) {
+        const airdropData = await airdropRes.json();
+
+        if (!airdropRes.ok) {
+          console.error("Airdrop failed:", airdropData.error);
+          if (airdropData.error?.includes("Fee payer wallet needs more SOL")) {
+            throw new Error("Service temporarily unavailable. Please try again later or contact support.");
+          }
+        } else if (airdropData.signature) {
+          console.log("Airdrop sent, waiting for confirmation...", airdropData.signature);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      } catch (airdropErr: any) {
+        if (airdropErr.message?.includes("Service temporarily unavailable")) {
+          throw airdropErr;
+        }
         console.log("Airdrop skipped or failed, continuing anyway:", airdropErr);
       }
 

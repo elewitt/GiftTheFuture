@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createGift, updateGift } from "@/lib/gifts";
 
+// Token amount is stored in raw units (6 decimals)
+const TOKEN_DECIMALS = 6;
+
 /**
  * POST /api/demo/create-gift
  * 
@@ -36,13 +39,14 @@ export async function POST(req: Request) {
       giftMessage = "This is a demo gift! 🎁",
     } = body;
 
-    // Create demo gift
+    // Create demo gift - tokenAmount stored in raw units (6 decimals)
+    const rawTokenAmount = Math.floor(shares * Math.pow(10, TOKEN_DECIMALS));
     const gift = await createGift({
       marketTicker,
       marketTitle,
       side: side as "yes" | "no",
       outcomeMint: `demo-${side}-mint-${Date.now()}`,
-      tokenAmount: shares,
+      tokenAmount: rawTokenAmount,
       costUSDC: shares * 0.5, // Assume 50 cent price
       senderPrivyId: "demo-sender",
       recipientName,
@@ -98,13 +102,15 @@ export async function GET() {
     );
   }
 
-  // Create a demo gift with defaults
+  // Create a demo gift with defaults - tokenAmount in raw units (6 decimals)
+  const displayShares = 25;
+  const rawTokenAmount = Math.floor(displayShares * Math.pow(10, TOKEN_DECIMALS));
   const gift = await createGift({
     marketTicker: "KXSB-26-LAC",
     marketTitle: "Will the Los Angeles Chargers win the 2026 Pro Football Championship?",
     side: "yes",
     outcomeMint: `demo-yes-mint-${Date.now()}`,
-    tokenAmount: 25,
+    tokenAmount: rawTokenAmount,
     costUSDC: 3.50,
     senderPrivyId: "demo-sender",
     recipientName: "Demo User",
@@ -167,7 +173,7 @@ code {
 
 <div class="info">
   <p><strong>Market:</strong> ${gift.marketTitle}</p>
-  <p><strong>Position:</strong> ${gift.tokenAmount} x YES</p>
+  <p><strong>Position:</strong> ${displayShares} x YES</p>
   <p><strong>Message:</strong> "${gift.giftMessage}"</p>
 </div>
 

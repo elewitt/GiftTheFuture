@@ -13,7 +13,9 @@ export default function HomePage() {
       <div id="markets">
         <MarketsSection />
       </div>
-      <HowItWorks />
+      <div id="how-it-works">
+        <HowItWorks />
+      </div>
       <CTASection />
       <Footer />
     </div>

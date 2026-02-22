@@ -132,6 +132,10 @@ export async function POST(req: Request) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const claimUrl = `${appUrl}/gift/${gift.id}`;
 
+    // Convert raw token amount to human-readable (DFlow tokens have 6 decimals)
+    const TOKEN_DECIMALS = 6;
+    const displayTokensReceived = tokensReceived / Math.pow(10, TOKEN_DECIMALS);
+
     // Send email if it looks like an email address
     if (recipientContact.includes("@")) {
       try {
@@ -144,7 +148,7 @@ export async function POST(req: Request) {
             senderName: "A friend", // Could fetch from Privy user
             marketTitle,
             side,
-            shares: tokensReceived,
+            shares: displayTokensReceived, // Use display amount for email
             giftMessage,
             claimUrl,
           }),
@@ -154,10 +158,6 @@ export async function POST(req: Request) {
         // Don't fail the gift creation if email fails
       }
     }
-
-    // Convert raw token amount to human-readable (DFlow tokens have 6 decimals)
-    const TOKEN_DECIMALS = 6;
-    const displayTokensReceived = tokensReceived / Math.pow(10, TOKEN_DECIMALS);
 
     return NextResponse.json({
       giftId: gift.id,
