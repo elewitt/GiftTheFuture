@@ -2,6 +2,7 @@
 
 import { usePrivy, useLogin } from "@privy-io/react-auth";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 
 export function Navbar() {
@@ -12,9 +13,13 @@ export function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-gradient-brand flex items-center justify-center text-xl">
-            🎁
-          </div>
+          <Image
+            src="/logo.png"
+            alt="Gift the Future"
+            width={40}
+            height={40}
+            className="rounded-lg"
+          />
           <span className="text-xl font-bold tracking-tight text-foreground">
             Gift the <span className="text-gradient-brand">Future</span>
           </span>
