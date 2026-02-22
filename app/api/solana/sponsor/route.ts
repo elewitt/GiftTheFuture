@@ -8,6 +8,14 @@ import {
 import bs58 from "bs58";
 
 const FEE_PAYER_PRIVATE_KEY = process.env.SOLANA_FEE_PAYER_PRIVATE_KEY;
+
+// Handle both old and new bs58 API
+const bs58Decode = (str: string): Uint8Array => {
+  if (typeof bs58.decode === "function") {
+    return bs58.decode(str);
+  }
+  return (bs58 as any).default.decode(str);
+};
 const RPC_URL = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
 
 // Whitelist of program IDs we allow sponsorship for
@@ -48,7 +56,7 @@ export async function POST(req: Request) {
     }
 
     // Decode the fee payer wallet
-    const feePayerWallet = Keypair.fromSecretKey(bs58.decode(FEE_PAYER_PRIVATE_KEY));
+    const feePayerWallet = Keypair.fromSecretKey(bs58Decode(FEE_PAYER_PRIVATE_KEY));
     const feePayerAddress = feePayerWallet.publicKey.toBase58();
 
     // Deserialize the transaction
@@ -129,7 +137,7 @@ export async function GET() {
       );
     }
 
-    const feePayerWallet = Keypair.fromSecretKey(bs58.decode(FEE_PAYER_PRIVATE_KEY));
+    const feePayerWallet = Keypair.fromSecretKey(bs58Decode(FEE_PAYER_PRIVATE_KEY));
 
     return NextResponse.json({
       feePayerAddress: feePayerWallet.publicKey.toBase58(),
