@@ -32,6 +32,7 @@ interface DFlowMarketFull {
  *
  * Query params:
  * - q: search query (optional)
+ * - category: filter by category (Sports, Politics, Economics)
  * - trending: if "true", return markets sorted by volume
  * - limit: number of results (default 30)
  */
@@ -39,6 +40,7 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("q")?.toLowerCase();
+    const category = searchParams.get("category");
     const limit = parseInt(searchParams.get("limit") || "30");
 
     // Fetch markets from DFlow with full price data
@@ -60,8 +62,14 @@ export async function GET(req: Request) {
         const searchText = `${m.title || ""} ${m.ticker || ""} ${m.eventTicker || ""}`.toLowerCase();
         return searchText.includes(query);
       });
+    } else if (category) {
+      // Filter by specific category
+      allMarkets = allMarkets.filter(m => {
+        const marketCategory = extractCategory(m.ticker);
+        return marketCategory === category;
+      });
     } else {
-      // Default: Focus on sports championship futures
+      // Default (trending): Focus on sports championship futures
       allMarkets = allMarkets.filter(m => isSportsChampionship(m.ticker, m.title));
     }
 
@@ -167,22 +175,36 @@ function extractCategory(ticker: string): string {
   if (!ticker) return "Other";
   const t = ticker.toUpperCase();
 
+  // Sports
   if (t.includes("NFL") || t.includes("NBA") || t.includes("MLB") ||
       t.includes("NHL") || t.includes("NCAA") || t.includes("MAR") ||
       t.includes("BOWL") || t.includes("MVP") || t.includes("PGA") ||
-      t.includes("PREMIER") || t.includes("OSCAR")) {
+      t.includes("PREMIER") || t.includes("OSCAR") || t.includes("TENNIS") ||
+      t.includes("GOLF") || t.includes("UFC") || t.includes("BOXING") ||
+      t.includes("SOCCER") || t.includes("WORLDCUP") || t.includes("OLYMPICS")) {
     return "Sports";
   }
+  // Politics
   if (t.includes("PRES") || t.includes("FED") || t.includes("NOM") ||
       t.includes("TRUMP") || t.includes("DEM") || t.includes("REP") ||
-      t.includes("POWELL") || t.includes("KHAMENEI") || t.includes("GREENLAND")) {
+      t.includes("POWELL") || t.includes("KHAMENEI") || t.includes("GREENLAND") ||
+      t.includes("BIDEN") || t.includes("CONGRESS") || t.includes("SENATE") ||
+      t.includes("SCOTUS") || t.includes("ELECT") || t.includes("VOTE") ||
+      t.includes("GOV") || t.includes("POPE") || t.includes("WAR") ||
+      t.includes("UKRAINE") || t.includes("RUSSIA") || t.includes("CHINA") ||
+      t.includes("IRAN") || t.includes("ISRAEL") || t.includes("NATO")) {
     return "Politics";
   }
-  if (t.includes("BTC") || t.includes("ETH") || t.includes("CRYPTO")) {
-    return "Crypto";
-  }
-  if (t.includes("EARNINGS")) {
-    return "Business";
+  // Economics
+  if (t.includes("CPI") || t.includes("GDP") || t.includes("FOMC") ||
+      t.includes("RATE") || t.includes("INFLATION") || t.includes("JOBS") ||
+      t.includes("UNEMPLOYMENT") || t.includes("RECESSION") || t.includes("DEBT") ||
+      t.includes("TREASURY") || t.includes("BOND") || t.includes("STOCK") ||
+      t.includes("SPX") || t.includes("SPY") || t.includes("QQQ") ||
+      t.includes("DOW") || t.includes("NASDAQ") || t.includes("EARNINGS") ||
+      t.includes("BTC") || t.includes("ETH") || t.includes("CRYPTO") ||
+      t.includes("OIL") || t.includes("GOLD") || t.includes("SILVER")) {
+    return "Economics";
   }
 
   return "Other";

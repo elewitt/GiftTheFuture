@@ -32,14 +32,17 @@ export function MarketsSection() {
   const retryCount = useRef(0);
 
   useEffect(() => {
-    fetchMarkets();
-  }, []);
+    fetchMarkets(selectedCategory);
+  }, [selectedCategory]);
 
-  async function fetchMarkets() {
+  async function fetchMarkets(category: string | null) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/markets?trending=true&limit=30", {
+      const url = category
+        ? `/api/markets?category=${category}&limit=30`
+        : "/api/markets?trending=true&limit=30";
+      const res = await fetch(url, {
         cache: "no-store",
       });
       if (!res.ok) throw new Error("Failed to fetch markets");
@@ -49,13 +52,15 @@ export function MarketsSection() {
         retryCount.current = 0;
       } else if (retryCount.current < 2) {
         retryCount.current++;
-        setTimeout(fetchMarkets, 1000);
+        setTimeout(() => fetchMarkets(category), 1000);
         return;
+      } else {
+        setMarkets([]);
       }
     } catch (err: any) {
       if (retryCount.current < 2) {
         retryCount.current++;
-        setTimeout(fetchMarkets, 1000);
+        setTimeout(() => fetchMarkets(category), 1000);
         return;
       }
       setError(err.message);
@@ -64,9 +69,7 @@ export function MarketsSection() {
     }
   }
 
-  const displayedMarkets = selectedCategory
-    ? markets.filter((m) => m.category === selectedCategory)
-    : markets;
+  const displayedMarkets = markets;
 
   return (
     <section className="container mx-auto px-4 py-16">
@@ -97,7 +100,7 @@ export function MarketsSection() {
           {tabs.find((t) => t.id === selectedCategory)?.label || "Trending"} Markets
         </h2>
         <button
-          onClick={fetchMarkets}
+          onClick={() => fetchMarkets(selectedCategory)}
           className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
         >
           Refresh
