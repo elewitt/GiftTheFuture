@@ -1,22 +1,34 @@
 import { NextResponse } from "next/server";
 import { createRedemptionOrder, getMarketByMint } from "@/lib/dflow";
 import { getTokenBalance } from "@/lib/solana";
+import {
+  VersionedTransaction,
+  TransactionMessage,
+  PublicKey,
+  Connection,
+  Keypair,
+} from "@solana/web3.js";
+import bs58 from "bs58";
+
+const FEE_PAYER_PRIVATE_KEY = process.env.SOLANA_FEE_PAYER_PRIVATE_KEY;
+const RPC_URL = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
 
 /**
  * POST /api/gift/redeem
  *
  * Returns an unsigned transaction for selling outcome tokens.
- * The recipient signs this via their Privy embedded wallet.
+ * If gas sponsorship is enabled, the transaction is rebuilt with our fee payer.
  *
  * Body: {
  *   outcomeMint: string,
  *   amount: number,
  *   userPublicKey: string,  // Recipient's wallet address
+ *   sponsored?: boolean,    // Whether to use gas sponsorship
  * }
  */
 export async function POST(req: Request) {
   try {
-    const { outcomeMint, amount, userPublicKey } = await req.json();
+    const { outcomeMint, amount, userPublicKey, sponsored } = await req.json();
 
     console.log("[/api/gift/redeem] Request:", { outcomeMint, amount, userPublicKey });
 
@@ -70,12 +82,73 @@ export async function POST(req: Request) {
       outAmount: order.outAmount,
     });
 
+    let finalTransaction = order.transaction;
+    let isSponsored = false;
+
+    // If gas sponsorship is requested and configured, rebuild transaction with our fee payer
+    if (sponsored && FEE_PAYER_PRIVATE_KEY) {
+      try {
+        const feePayerWallet = Keypair.fromSecretKey(bs58.decode(FEE_PAYER_PRIVATE_KEY));
+        const feePayerPubkey = feePayerWallet.publicKey;
+
+        // Deserialize the original transaction
+        const txBuffer = Buffer.from(order.transaction, "base64");
+        const originalTx = VersionedTransaction.deserialize(new Uint8Array(txBuffer));
+
+        // Get a fresh blockhash
+        const connection = new Connection(RPC_URL, "confirmed");
+        const { blockhash } = await connection.getLatestBlockhash();
+
+        // Decompile the message to get instructions
+        const message = originalTx.message;
+        const accountKeys = message.staticAccountKeys;
+
+        // Extract instructions from the versioned transaction
+        const compiledInstructions = message.compiledInstructions;
+
+        // Build new instructions with the original account keys
+        const instructions = compiledInstructions.map((ix) => {
+          const programId = accountKeys[ix.programIdIndex];
+          const keys = ix.accountKeyIndexes.map((idx) => ({
+            pubkey: accountKeys[idx],
+            isSigner: message.isAccountSigner(idx),
+            isWritable: message.isAccountWritable(idx),
+          }));
+          return {
+            programId,
+            keys,
+            data: Buffer.from(ix.data),
+          };
+        });
+
+        // Rebuild the transaction message with our fee payer
+        const newMessage = new TransactionMessage({
+          payerKey: feePayerPubkey,
+          recentBlockhash: blockhash,
+          instructions,
+        }).compileToV0Message();
+
+        const newTx = new VersionedTransaction(newMessage);
+        finalTransaction = Buffer.from(newTx.serialize()).toString("base64");
+        isSponsored = true;
+
+        console.log("[/api/gift/redeem] Transaction rebuilt with fee payer:", feePayerPubkey.toBase58());
+      } catch (rebuildErr: any) {
+        console.error("[/api/gift/redeem] Failed to rebuild transaction for sponsorship:", rebuildErr);
+        // Fall back to original transaction
+      }
+    }
+
     return NextResponse.json({
-      transaction: order.transaction,
+      transaction: finalTransaction,
       executionMode: order.executionMode,
       inAmount: order.inAmount,
       outAmount: order.outAmount,
       minOutAmount: order.minOutAmount,
+      sponsored: isSponsored,
+      feePayerAddress: isSponsored && FEE_PAYER_PRIVATE_KEY
+        ? Keypair.fromSecretKey(bs58.decode(FEE_PAYER_PRIVATE_KEY)).publicKey.toBase58()
+        : null,
     });
   } catch (error: any) {
     console.error("[/api/gift/redeem] Error:", error.message);

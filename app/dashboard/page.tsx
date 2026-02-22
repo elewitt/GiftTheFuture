@@ -210,7 +210,7 @@ export default function DashboardPage() {
     }
 
     try {
-      // Step 1: Get the unsigned transaction from DFlow
+      // Step 1: Get a sponsored transaction from DFlow (rebuilt with our fee payer)
       setCashout((prev) => ({ ...prev, step: "signing" }));
 
       const redeemRes = await fetch("/api/gift/redeem", {
@@ -220,6 +220,7 @@ export default function DashboardPage() {
           outcomeMint: position.outcomeMint,
           amount: Math.floor(position.shares * 1_000_000), // Convert to raw amount
           userPublicKey: wallet.address,
+          sponsored: true, // Request gas sponsorship
         }),
       });
 
@@ -228,7 +229,7 @@ export default function DashboardPage() {
         throw new Error(errData.error || "Failed to create sell order");
       }
 
-      const { transaction: base64Tx, outAmount } = await redeemRes.json();
+      const { transaction: base64Tx, outAmount, sponsored } = await redeemRes.json();
 
       // Step 2: Deserialize and sign the transaction
       const txBuffer = Buffer.from(base64Tx, "base64");
@@ -236,34 +237,56 @@ export default function DashboardPage() {
 
       setCashout((prev) => ({ ...prev, step: "sending" }));
 
-      // Sign and send using Privy wallet
+      // Sign with Privy wallet (user authorizes the token transfer)
       const signedTx = await wallet.signTransaction(transaction);
 
-      // Send the transaction
-      const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
-      const connection = new (await import("@solana/web3.js")).Connection(
-        rpcUrl,
-        "confirmed"
-      );
+      let signature: string;
 
-      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
-        skipPreflight: false,
-        maxRetries: 3,
-      });
+      if (sponsored) {
+        // Step 3a: Send to our sponsor endpoint which adds fee payer signature and broadcasts
+        const sponsorRes = await fetch("/api/solana/sponsor", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            transaction: Buffer.from(signedTx.serialize()).toString("base64"),
+            userAddress: wallet.address,
+          }),
+        });
+
+        if (!sponsorRes.ok) {
+          const errData = await sponsorRes.json();
+          throw new Error(errData.error || "Failed to sponsor transaction");
+        }
+
+        const sponsorResult = await sponsorRes.json();
+        signature = sponsorResult.signature;
+      } else {
+        // Step 3b: Fallback - send directly (user pays gas)
+        const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+        const connection = new (await import("@solana/web3.js")).Connection(
+          rpcUrl,
+          "confirmed"
+        );
+
+        signature = await connection.sendRawTransaction(signedTx.serialize(), {
+          skipPreflight: false,
+          maxRetries: 3,
+        });
+
+        // Wait for confirmation
+        const latestBlockhash = await connection.getLatestBlockhash();
+        await connection.confirmTransaction({
+          signature,
+          blockhash: latestBlockhash.blockhash,
+          lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+        });
+      }
 
       setCashout((prev) => ({
         ...prev,
         step: "confirming",
         signature,
       }));
-
-      // Step 3: Wait for confirmation
-      const latestBlockhash = await connection.getLatestBlockhash();
-      await connection.confirmTransaction({
-        signature,
-        blockhash: latestBlockhash.blockhash,
-        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-      });
 
       // Step 4: Update gift status in database
       const usdcReceived = Number(outAmount) / 1_000_000;
@@ -290,10 +313,22 @@ export default function DashboardPage() {
       }, 3000);
     } catch (err: any) {
       console.error("Cashout error:", err);
+
+      // Parse the error for user-friendly messages
+      let errorMessage = err.message || "Cashout failed";
+
+      if (errorMessage.includes("debit an account") || errorMessage.includes("no record of a prior credit")) {
+        errorMessage = "Transaction failed. Please try again or contact support.";
+      } else if (errorMessage.includes("insufficient funds") || errorMessage.includes("Insufficient")) {
+        errorMessage = "Insufficient funds for this transaction. Please check your wallet balance.";
+      } else if (errorMessage.includes("simulation failed")) {
+        errorMessage = "Transaction simulation failed. The position may have already been sold or expired.";
+      }
+
       setCashout((prev) => ({
         ...prev,
         step: "error",
-        error: err.message || "Cashout failed",
+        error: errorMessage,
       }));
     }
   }, [cashout.position, wallets]);
@@ -375,20 +410,36 @@ export default function DashboardPage() {
       const senderPubkey = new PublicKey(wallet.address);
       const usdcMint = new PublicKey(USDC_MINT);
 
+      // Try to get fee payer for sponsorship
+      let feePayerPubkey: PublicKey | null = null;
+      try {
+        const sponsorRes = await fetch("/api/solana/sponsor");
+        if (sponsorRes.ok) {
+          const { feePayerAddress } = await sponsorRes.json();
+          if (feePayerAddress) {
+            feePayerPubkey = new PublicKey(feePayerAddress);
+          }
+        }
+      } catch {
+        // Sponsorship not available, user will pay fees
+      }
+
+      const actualFeePayer = feePayerPubkey || senderPubkey;
+
       // Get ATAs
       const senderATA = getAssociatedTokenAddressSync(usdcMint, senderPubkey);
       const destinationATA = getAssociatedTokenAddressSync(usdcMint, destinationPubkey);
 
-      // Build transaction
-      const tx = new Transaction();
+      // Build instructions array
+      const instructions: any[] = [];
 
       // Check if destination ATA exists, if not create it
       const destATAInfo = await connection.getAccountInfo(destinationATA);
       if (!destATAInfo) {
         const { createAssociatedTokenAccountInstruction } = await import("@solana/spl-token");
-        tx.add(
+        instructions.push(
           createAssociatedTokenAccountInstruction(
-            senderPubkey, // payer
+            actualFeePayer, // payer (fee payer creates the ATA)
             destinationATA, // ATA address
             destinationPubkey, // owner
             usdcMint // mint
@@ -398,7 +449,7 @@ export default function DashboardPage() {
 
       // Add transfer instruction
       const amountLamports = Math.floor(amount * 1_000_000); // USDC has 6 decimals
-      tx.add(
+      instructions.push(
         createTransferInstruction(
           senderATA,
           destinationATA,
@@ -407,28 +458,58 @@ export default function DashboardPage() {
         )
       );
 
-      // Set recent blockhash and fee payer
+      // Get latest blockhash
       const latestBlockhash = await connection.getLatestBlockhash();
-      tx.recentBlockhash = latestBlockhash.blockhash;
-      tx.feePayer = senderPubkey;
+
+      // Build versioned transaction with fee payer
+      const { TransactionMessage } = await import("@solana/web3.js");
+      const message = new TransactionMessage({
+        payerKey: actualFeePayer,
+        recentBlockhash: latestBlockhash.blockhash,
+        instructions,
+      }).compileToV0Message();
+
+      const tx = new VersionedTransaction(message);
 
       setWithdraw((prev) => ({ ...prev, step: "sending" }));
 
-      // Sign with Privy wallet
+      // Sign with Privy wallet (user authorizes the transfer)
       const signedTx = await wallet.signTransaction(tx);
 
-      // Send transaction
-      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
-        skipPreflight: false,
-        maxRetries: 3,
-      });
+      let signature: string;
 
-      // Wait for confirmation
-      await connection.confirmTransaction({
-        signature,
-        blockhash: latestBlockhash.blockhash,
-        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-      });
+      if (feePayerPubkey) {
+        // Send to sponsor endpoint for fee payer signature + broadcast
+        const sponsorRes = await fetch("/api/solana/sponsor", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            transaction: Buffer.from(signedTx.serialize()).toString("base64"),
+            userAddress: wallet.address,
+          }),
+        });
+
+        if (!sponsorRes.ok) {
+          const errData = await sponsorRes.json();
+          throw new Error(errData.error || "Failed to sponsor transaction");
+        }
+
+        const sponsorResult = await sponsorRes.json();
+        signature = sponsorResult.signature;
+      } else {
+        // Fallback - send directly (user pays gas)
+        signature = await connection.sendRawTransaction(signedTx.serialize(), {
+          skipPreflight: false,
+          maxRetries: 3,
+        });
+
+        // Wait for confirmation
+        await connection.confirmTransaction({
+          signature,
+          blockhash: latestBlockhash.blockhash,
+          lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+        });
+      }
 
       setWithdraw((prev) => ({ ...prev, step: "done", signature }));
 
@@ -438,10 +519,22 @@ export default function DashboardPage() {
       }, 2000);
     } catch (err: any) {
       console.error("Withdraw error:", err);
+
+      // Parse the error for user-friendly messages
+      let errorMessage = err.message || "Withdrawal failed";
+
+      if (errorMessage.includes("debit an account") || errorMessage.includes("no record of a prior credit")) {
+        errorMessage = "Your wallet doesn't have enough SOL for transaction fees. Please add at least 0.01 SOL to your wallet.";
+      } else if (errorMessage.includes("insufficient funds") || errorMessage.includes("Insufficient")) {
+        errorMessage = "Insufficient USDC balance for this withdrawal.";
+      } else if (errorMessage.includes("simulation failed")) {
+        errorMessage = "Transaction simulation failed. Please check your wallet balance and try again.";
+      }
+
       setWithdraw((prev) => ({
         ...prev,
         step: "error",
-        error: err.message || "Withdrawal failed",
+        error: errorMessage,
       }));
     }
   }, [withdraw.destinationAddress, withdraw.amount, wallets, usdcBalance]);
