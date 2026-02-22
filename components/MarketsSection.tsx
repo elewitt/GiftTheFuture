@@ -118,7 +118,7 @@ export function MarketsSection() {
           <p className="text-destructive text-sm mb-2">Couldn&apos;t load markets</p>
           <p className="text-muted-foreground text-xs max-w-sm mx-auto mb-4">{error}</p>
           <button
-            onClick={fetchMarkets}
+            onClick={() => fetchMarkets(selectedCategory)}
             className="px-6 py-3 rounded-xl bg-secondary text-foreground text-sm hover:bg-secondary/80 transition"
           >
             Try Again
