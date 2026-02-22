@@ -180,8 +180,9 @@ export default function GiftClaimPage() {
 
       // Stop confetti after a few seconds
       setTimeout(() => setConfetti(false), 5000);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Claim error:", err);
+      setWalletError(err.message || "Claim failed");
       setStep("error");
     }
   }
@@ -202,10 +203,10 @@ export default function GiftClaimPage() {
   // ─── Loading ──────────────────────────────────────────────
   if (step === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="w-10 h-10 border-2 border-primary-500/20 border-t-primary-500 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm text-slate-500">Loading your gift...</p>
+          <div className="w-10 h-10 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-muted-foreground">Loading your gift...</p>
         </div>
       </div>
     );
@@ -214,18 +215,18 @@ export default function GiftClaimPage() {
   // ─── Not found ───────────────────────────────────────────
   if (step === "not_found") {
     return (
-      <div className="min-h-screen flex items-center justify-center px-5 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+      <div className="min-h-screen flex items-center justify-center px-5 bg-background">
         <div className="text-center max-w-sm">
-          <div className="w-20 h-20 rounded-full bg-slate-800/50 flex items-center justify-center mx-auto mb-6">
+          <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center mx-auto mb-6">
             <span className="text-4xl">🔍</span>
           </div>
-          <h1 className="text-xl font-bold mb-2 text-slate-200">Gift not found</h1>
-          <p className="text-sm text-slate-500 mb-6">
+          <h1 className="text-xl font-bold mb-2 text-foreground">Gift not found</h1>
+          <p className="text-sm text-muted-foreground mb-6">
             This gift link may have expired or doesn&apos;t exist.
           </p>
           <Link
             href="/"
-            className="text-sm text-primary-400 hover:text-primary-300"
+            className="text-sm text-primary hover:text-primary/80"
           >
             ← Browse markets
           </Link>
@@ -237,13 +238,13 @@ export default function GiftClaimPage() {
   // ─── Already claimed ─────────────────────────────────────
   if (step === "already_claimed") {
     return (
-      <div className="min-h-screen flex items-center justify-center px-5 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+      <div className="min-h-screen flex items-center justify-center px-5 bg-background">
         <div className="text-center max-w-sm">
-          <div className="w-20 h-20 rounded-full bg-primary-500/10 border border-primary-500/20 flex items-center justify-center mx-auto mb-6">
+          <div className="w-20 h-20 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-6">
             <span className="text-4xl">✅</span>
           </div>
-          <h1 className="text-xl font-bold mb-2 text-slate-200">Already claimed</h1>
-          <p className="text-sm text-slate-500 mb-6">
+          <h1 className="text-xl font-bold mb-2 text-foreground">Already claimed</h1>
+          <p className="text-sm text-muted-foreground mb-6">
             This gift has already been claimed.
           </p>
           <Link href="/dashboard">
@@ -259,13 +260,13 @@ export default function GiftClaimPage() {
   // ─── Gift Reveal (unopened) ────────────────────────────────
   if (step === "reveal") {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-5 bg-gradient-to-b from-slate-950 via-primary-950/20 to-slate-950">
+      <div className="min-h-screen flex flex-col items-center justify-center px-5 bg-background">
         {/* Floating particles background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-primary-500/30 rounded-full animate-pulse" />
-          <div className="absolute top-1/3 right-1/3 w-1 h-1 bg-accent-500/40 rounded-full animate-pulse delay-300" />
-          <div className="absolute bottom-1/3 left-1/3 w-1.5 h-1.5 bg-primary-500/30 rounded-full animate-pulse delay-500" />
-          <div className="absolute top-1/2 right-1/4 w-1 h-1 bg-accent-500/30 rounded-full animate-pulse delay-700" />
+          <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-primary/30 rounded-full animate-pulse" />
+          <div className="absolute top-1/3 right-1/3 w-1 h-1 bg-accent/40 rounded-full animate-pulse delay-300" />
+          <div className="absolute bottom-1/3 left-1/3 w-1.5 h-1.5 bg-primary/30 rounded-full animate-pulse delay-500" />
+          <div className="absolute top-1/2 right-1/4 w-1 h-1 bg-accent/30 rounded-full animate-pulse delay-700" />
         </div>
 
         <motion.div
@@ -274,7 +275,7 @@ export default function GiftClaimPage() {
           transition={{ duration: 0.6 }}
           className="text-center max-w-md relative z-10"
         >
-          <p className="text-xs font-semibold tracking-[0.2em] uppercase text-primary-400 mb-6">
+          <p className="text-xs font-semibold tracking-[0.2em] uppercase text-primary mb-6">
             You&apos;ve received a gift
           </p>
 
@@ -292,9 +293,9 @@ export default function GiftClaimPage() {
               className="relative w-40 h-40 mx-auto bg-gradient-brand rounded-3xl shadow-2xl"
             >
               {/* Ribbon horizontal */}
-              <div className="absolute top-1/2 left-0 right-0 h-4 bg-accent-400/90 -translate-y-1/2" />
+              <div className="absolute top-1/2 left-0 right-0 h-4 bg-accent/90 -translate-y-1/2" />
               {/* Ribbon vertical */}
-              <div className="absolute top-0 bottom-0 left-1/2 w-4 bg-accent-400/90 -translate-x-1/2" />
+              <div className="absolute top-0 bottom-0 left-1/2 w-4 bg-accent/90 -translate-x-1/2" />
               {/* Bow */}
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-4xl">
                 🎀
@@ -304,7 +305,7 @@ export default function GiftClaimPage() {
             </motion.div>
           </button>
 
-          <h1 className="text-2xl font-bold text-slate-100 mb-3">
+          <h1 className="text-2xl font-bold text-foreground mb-3">
             {gift.recipientName ? `${gift.recipientName}, someone` : "Someone"} sent you
             <br />
             <span className="text-gradient-brand">
@@ -312,7 +313,7 @@ export default function GiftClaimPage() {
             </span>
           </h1>
 
-          <p className="text-slate-500 text-sm mb-8">
+          <p className="text-muted-foreground text-sm mb-8">
             Tap the gift to see what&apos;s inside
           </p>
 
@@ -327,7 +328,7 @@ export default function GiftClaimPage() {
   // ─── Opening animation ────────────────────────────────────
   if (step === "opening") {
     return (
-      <div className="min-h-screen flex items-center justify-center px-5 bg-gradient-to-b from-slate-950 via-primary-950/30 to-slate-950">
+      <div className="min-h-screen flex items-center justify-center px-5 bg-background">
         <div className="text-center">
           {/* Animated gift box opening */}
           <motion.div
@@ -340,7 +341,7 @@ export default function GiftClaimPage() {
               <span className="text-6xl animate-spin">✨</span>
             </div>
           </motion.div>
-          <p className="text-slate-400 animate-pulse">Opening your gift...</p>
+          <p className="text-muted-foreground animate-pulse">Opening your gift...</p>
         </div>
       </div>
     );
@@ -351,7 +352,7 @@ export default function GiftClaimPage() {
     const potentialPayout = gift.tokenAmount;
 
     return (
-      <div className="min-h-screen flex items-center justify-center px-5 py-10 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+      <div className="min-h-screen flex items-center justify-center px-5 py-10 bg-background">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -361,48 +362,48 @@ export default function GiftClaimPage() {
           {/* Celebration emoji */}
           <div className="text-5xl mb-4 animate-bounce">🎉</div>
 
-          <p className="text-xs font-semibold tracking-[0.15em] uppercase text-primary-400 mb-2">
+          <p className="text-xs font-semibold tracking-[0.15em] uppercase text-primary mb-2">
             Here&apos;s what you got
           </p>
 
-          <h1 className="text-2xl font-bold text-slate-100 mb-6">
+          <h1 className="text-2xl font-bold text-foreground mb-6">
             A prediction market position
           </h1>
 
           {/* Position card */}
-          <div className="glass rounded-3xl p-6 text-left mb-6 shadow-xl">
+          <div className="bg-card border border-border rounded-3xl p-6 text-left mb-6 shadow-lg">
             {/* Market title */}
             <div className="mb-4">
-              <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Market</p>
-              <h2 className="text-lg font-semibold text-slate-100 leading-snug">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Market</p>
+              <h2 className="text-lg font-semibold text-foreground leading-snug">
                 {gift.marketTitle}
               </h2>
             </div>
 
             {/* Position details */}
             <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="bg-slate-800/50 rounded-xl p-3">
-                <p className="text-xs text-slate-500 mb-1">Your Bet</p>
-                <p className={`text-xl font-bold ${gift.side === "yes" ? "text-primary-400" : "text-red-400"}`}>
+              <div className="bg-secondary rounded-xl p-3">
+                <p className="text-xs text-muted-foreground mb-1">Your Bet</p>
+                <p className="text-xl font-bold" style={{ color: gift.side === "yes" ? "hsl(var(--yes))" : "hsl(var(--no))" }}>
                   {gift.side.toUpperCase()}
                 </p>
               </div>
-              <div className="bg-slate-800/50 rounded-xl p-3">
-                <p className="text-xs text-slate-500 mb-1">Shares</p>
-                <p className="text-xl font-bold text-slate-100">
+              <div className="bg-secondary rounded-xl p-3">
+                <p className="text-xs text-muted-foreground mb-1">Shares</p>
+                <p className="text-xl font-bold text-foreground">
                   {gift.tokenAmount}
                 </p>
               </div>
             </div>
 
             {/* Potential payout */}
-            <div className="bg-gradient-brand-subtle border border-accent-500/20 rounded-xl p-4">
+            <div className="bg-accent/10 border border-accent/20 rounded-xl p-4">
               <div className="flex justify-between items-center">
                 <div>
-                  <p className="text-xs text-slate-400">If {gift.side.toUpperCase()} wins</p>
-                  <p className="text-xs text-slate-500">You&apos;ll receive</p>
+                  <p className="text-xs text-muted-foreground">If {gift.side.toUpperCase()} wins</p>
+                  <p className="text-xs text-muted-foreground">You&apos;ll receive</p>
                 </div>
-                <p className="text-2xl font-bold text-accent-400">
+                <p className="text-2xl font-bold text-accent">
                   ${potentialPayout.toFixed(2)}
                 </p>
               </div>
@@ -410,9 +411,9 @@ export default function GiftClaimPage() {
 
             {/* Gift message */}
             {gift.giftMessage && (
-              <div className="mt-4 pt-4 border-t border-slate-700/50">
-                <p className="text-xs text-slate-500 mb-2">Message from sender</p>
-                <p className="text-sm text-slate-300 italic bg-slate-800/30 rounded-xl p-3">
+              <div className="mt-4 pt-4 border-t border-border">
+                <p className="text-xs text-muted-foreground mb-2">Message from sender</p>
+                <p className="text-sm text-foreground italic bg-secondary rounded-xl p-3">
                   &quot;{gift.giftMessage}&quot;
                 </p>
               </div>
@@ -437,14 +438,14 @@ export default function GiftClaimPage() {
                   "Claim Your Gift →"
                 )}
               </Button>
-              <p className="text-xs text-slate-600 mt-3">
+              <p className="text-xs text-muted-foreground mt-3">
                 Sign in with email, Google, or phone — no crypto wallet needed
               </p>
             </div>
           ) : (
             <div className="py-4">
-              <div className="w-6 h-6 border-2 border-primary-500/20 border-t-primary-500 rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-sm text-slate-400">Setting up your wallet...</p>
+              <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">Setting up your wallet...</p>
             </div>
           )}
         </motion.div>
@@ -455,24 +456,24 @@ export default function GiftClaimPage() {
   // ─── Claiming ─────────────────────────────────────────────
   if (step === "claiming") {
     return (
-      <div className="min-h-screen flex items-center justify-center px-5 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+      <div className="min-h-screen flex items-center justify-center px-5 bg-background">
         <div className="text-center max-w-sm">
           <div className="relative w-20 h-20 mx-auto mb-6">
-            <div className="absolute inset-0 bg-primary-500/20 rounded-full animate-ping" />
+            <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
             <div className="relative w-20 h-20 bg-gradient-brand rounded-full flex items-center justify-center">
               <div className="w-8 h-8 border-3 border-white/30 border-t-white rounded-full animate-spin" />
             </div>
           </div>
-          <h2 className="text-xl font-bold text-slate-100 mb-2">
+          <h2 className="text-xl font-bold text-foreground mb-2">
             Claiming your position
           </h2>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted-foreground">
             Transferring to your wallet on Solana...
           </p>
           <div className="mt-6 flex justify-center gap-1">
-            <span className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-            <span className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-            <span className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
           </div>
         </div>
       </div>
@@ -482,7 +483,7 @@ export default function GiftClaimPage() {
   // ─── Claimed successfully ────────────────────────────────
   if (step === "claimed") {
     return (
-      <div className="min-h-screen flex items-center justify-center px-5 py-10 bg-gradient-to-b from-slate-950 via-primary-950/10 to-slate-950 relative overflow-hidden">
+      <div className="min-h-screen flex items-center justify-center px-5 py-10 bg-background relative overflow-hidden">
         {/* Confetti */}
         {confetti && (
           <div className="absolute inset-0 pointer-events-none">
@@ -519,44 +520,44 @@ export default function GiftClaimPage() {
         >
           {/* Success checkmark */}
           <div className="relative w-24 h-24 mx-auto mb-6">
-            <div className="absolute inset-0 bg-primary-500/20 rounded-full animate-ping" />
-            <div className="relative w-24 h-24 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center shadow-lg glow-primary">
+            <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+            <div className="relative w-24 h-24 bg-gradient-brand rounded-full flex items-center justify-center shadow-lg">
               <svg className="w-12 h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
               </svg>
             </div>
           </div>
 
-          <h1 className="text-3xl font-bold text-slate-100 mb-2">
+          <h1 className="text-3xl font-bold text-foreground mb-2">
             It&apos;s yours! 🎉
           </h1>
-          <p className="text-slate-400 mb-8">
+          <p className="text-muted-foreground mb-8">
             Your position has been transferred to your wallet
           </p>
 
           {/* Position summary card */}
-          <div className="glass rounded-2xl p-5 text-left mb-6">
+          <div className="bg-card border border-border rounded-2xl p-5 text-left mb-6">
             <div className="flex justify-between items-start mb-4">
               <div className="flex-1">
-                <p className="text-xs text-slate-500 mb-1">Market</p>
-                <p className="text-sm font-medium text-slate-200">{gift.marketTitle}</p>
+                <p className="text-xs text-muted-foreground mb-1">Market</p>
+                <p className="text-sm font-medium text-foreground">{gift.marketTitle}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="bg-slate-800/50 rounded-xl p-3 text-center">
-                <p className="text-xs text-slate-500 mb-1">Position</p>
-                <p className={`text-lg font-bold ${gift.side === "yes" ? "text-primary-400" : "text-red-400"}`}>
+              <div className="bg-secondary rounded-xl p-3 text-center">
+                <p className="text-xs text-muted-foreground mb-1">Position</p>
+                <p className="text-lg font-bold" style={{ color: gift.side === "yes" ? "hsl(var(--yes))" : "hsl(var(--no))" }}>
                   {gift.side.toUpperCase()}
                 </p>
               </div>
-              <div className="bg-slate-800/50 rounded-xl p-3 text-center">
-                <p className="text-xs text-slate-500 mb-1">Shares</p>
-                <p className="text-lg font-bold text-slate-100">{gift.tokenAmount}</p>
+              <div className="bg-secondary rounded-xl p-3 text-center">
+                <p className="text-xs text-muted-foreground mb-1">Shares</p>
+                <p className="text-lg font-bold text-foreground">{gift.tokenAmount}</p>
               </div>
-              <div className="bg-slate-800/50 rounded-xl p-3 text-center">
-                <p className="text-xs text-slate-500 mb-1">Payout</p>
-                <p className="text-lg font-bold text-accent-400">${gift.tokenAmount.toFixed(2)}</p>
+              <div className="bg-secondary rounded-xl p-3 text-center">
+                <p className="text-xs text-muted-foreground mb-1">Payout</p>
+                <p className="text-lg font-bold text-accent">${gift.tokenAmount.toFixed(2)}</p>
               </div>
             </div>
 
@@ -565,7 +566,7 @@ export default function GiftClaimPage() {
                 href={`https://solscan.io/tx/${claimTx}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 text-xs text-primary-400 hover:text-primary-300 transition"
+                className="flex items-center justify-center gap-2 text-xs text-primary hover:text-primary/80 transition"
               >
                 <span>View on Solscan</span>
                 <span className="font-mono">{claimTx.slice(0, 6)}...{claimTx.slice(-4)}</span>
@@ -577,18 +578,18 @@ export default function GiftClaimPage() {
           </div>
 
           {/* What's next */}
-          <div className="glass rounded-xl p-4 mb-6 text-left">
-            <p className="text-xs font-semibold text-slate-400 mb-3">What happens next?</p>
+          <div className="bg-card border border-border rounded-xl p-4 mb-6 text-left">
+            <p className="text-xs font-semibold text-muted-foreground mb-3">What happens next?</p>
             <div className="space-y-2">
               <div className="flex items-start gap-3">
-                <span className="text-primary-400 mt-0.5">✓</span>
-                <p className="text-sm text-slate-300">
+                <span className="text-primary mt-0.5">✓</span>
+                <p className="text-sm text-foreground">
                   <strong>Hold</strong> until the market resolves — if {gift.side.toUpperCase()} wins, you get ${gift.tokenAmount.toFixed(2)}
                 </p>
               </div>
               <div className="flex items-start gap-3">
-                <span className="text-primary-400 mt-0.5">✓</span>
-                <p className="text-sm text-slate-300">
+                <span className="text-primary mt-0.5">✓</span>
+                <p className="text-sm text-foreground">
                   <strong>Or cash out</strong> anytime at the current market price
                 </p>
               </div>
@@ -609,7 +610,7 @@ export default function GiftClaimPage() {
             </Link>
           </div>
 
-          <p className="text-xs text-slate-600 mt-6">
+          <p className="text-xs text-muted-foreground mt-6">
             Your position is on Solana and can be traded on any compatible DEX
           </p>
         </motion.div>
@@ -620,17 +621,17 @@ export default function GiftClaimPage() {
   // ─── Error ────────────────────────────────────────────────
   if (step === "error") {
     return (
-      <div className="min-h-screen flex items-center justify-center px-5 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+      <div className="min-h-screen flex items-center justify-center px-5 bg-background">
         <div className="text-center max-w-sm">
-          <div className="w-20 h-20 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-6">
+          <div className="w-20 h-20 rounded-full bg-destructive/10 border border-destructive/20 flex items-center justify-center mx-auto mb-6">
             <span className="text-4xl">😕</span>
           </div>
-          <h1 className="text-xl font-bold mb-2 text-slate-200">Something went wrong</h1>
-          <p className="text-sm text-slate-500 mb-4">
+          <h1 className="text-xl font-bold mb-2 text-foreground">Something went wrong</h1>
+          <p className="text-sm text-muted-foreground mb-4">
             We couldn&apos;t claim your gift. Please try again.
           </p>
           {walletError && (
-            <p className="text-xs text-red-400 bg-red-500/10 rounded-lg p-3 mb-4 font-mono">
+            <p className="text-xs text-destructive bg-destructive/10 rounded-lg p-3 mb-4 font-mono">
               {walletError}
             </p>
           )}
