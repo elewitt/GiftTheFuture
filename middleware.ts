@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Restricted countries
+// Restricted countries (US temporarily removed for testing)
 const BLOCKED_COUNTRIES = [
-  "US", // United States
+  // "US", // United States
   "AF", // Afghanistan
   "DZ", // Algeria
   "AO", // Angola
