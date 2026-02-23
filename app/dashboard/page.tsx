@@ -735,24 +735,28 @@ export default function DashboardPage() {
             className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
           >
             <SummaryCard
+              icon="📊"
               label="Portfolio Value"
               value={`$${data.summary.totalValue.toFixed(2)}`}
               subtext={`${data.summary.positionCount} position${data.summary.positionCount !== 1 ? "s" : ""}`}
               color="primary"
             />
             <SummaryCard
+              icon="🎯"
               label="Potential Payout"
               value={`$${data.summary.totalPotential.toFixed(2)}`}
               subtext="If all correct"
               color="accent"
             />
             <SummaryCard
+              icon={data.summary.totalProfitLoss >= 0 ? "📈" : "📉"}
               label="Total P&L"
               value={`${data.summary.totalProfitLoss >= 0 ? "+" : ""}$${data.summary.totalProfitLoss.toFixed(2)}`}
               subtext={`Cost basis: $${data.summary.totalCostBasis.toFixed(2)}`}
               color={data.summary.totalProfitLoss >= 0 ? "emerald" : "red"}
             />
             <SummaryCard
+              icon="🎁"
               label="Gifts Sent"
               value={data.summary.sentCount.toString()}
               subtext={data.summary.pendingCount > 0 ? `${data.summary.pendingCount} pending` : "All claimed"}
@@ -938,22 +942,32 @@ export default function DashboardPage() {
 }
 
 function SummaryCard({
+  icon,
   label,
   value,
   subtext,
   color,
 }: {
+  icon: string;
   label: string;
   value: string;
   subtext: string;
   color: "primary" | "accent" | "emerald" | "red" | "violet";
 }) {
   const colorClasses = {
-    primary: "from-primary/10 to-primary/5 border-primary/20",
-    accent: "from-amber-500/10 to-amber-500/5 border-amber-500/20",
-    emerald: "from-emerald-500/10 to-emerald-500/5 border-emerald-500/20",
-    red: "from-red-500/10 to-red-500/5 border-red-500/20",
-    violet: "from-violet-500/10 to-violet-500/5 border-violet-500/20",
+    primary: "from-primary/15 to-primary/5 border-primary/30 shadow-primary/5",
+    accent: "from-amber-500/15 to-amber-500/5 border-amber-500/30 shadow-amber-500/5",
+    emerald: "from-emerald-500/15 to-emerald-500/5 border-emerald-500/30 shadow-emerald-500/5",
+    red: "from-red-500/15 to-red-500/5 border-red-500/30 shadow-red-500/5",
+    violet: "from-violet-500/15 to-violet-500/5 border-violet-500/30 shadow-violet-500/5",
+  };
+
+  const iconBgColors = {
+    primary: "bg-primary/20",
+    accent: "bg-amber-500/20",
+    emerald: "bg-emerald-500/20",
+    red: "bg-red-500/20",
+    violet: "bg-violet-500/20",
   };
 
   const textColors = {
@@ -965,11 +979,20 @@ function SummaryCard({
   };
 
   return (
-    <div className={`p-4 rounded-xl bg-gradient-to-br ${colorClasses[color]} border`}>
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
-      <p className={`text-xl font-bold ${textColors[color]}`}>{value}</p>
-      <p className="text-[10px] text-muted-foreground mt-1">{subtext}</p>
-    </div>
+    <motion.div
+      whileHover={{ scale: 1.02, y: -2 }}
+      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+      className={`p-4 rounded-2xl bg-gradient-to-br ${colorClasses[color]} border shadow-lg backdrop-blur-sm`}
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className={`w-10 h-10 rounded-xl ${iconBgColors[color]} flex items-center justify-center`}>
+          <span className="text-lg">{icon}</span>
+        </div>
+      </div>
+      <p className={`text-2xl font-bold ${textColors[color]} mb-1`}>{value}</p>
+      <p className="text-xs font-medium text-foreground/80 mb-0.5">{label}</p>
+      <p className="text-[10px] text-muted-foreground">{subtext}</p>
+    </motion.div>
   );
 }
 
