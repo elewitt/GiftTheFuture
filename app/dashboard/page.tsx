@@ -785,12 +785,20 @@ export default function DashboardPage() {
                   View Wallet
                 </Button>
                 <Button
+                  onClick={openWithdrawModal}
+                  disabled={!usdcBalance || usdcBalance <= 0}
+                  variant="secondary"
+                  size="sm"
+                >
+                  Send to Wallet
+                </Button>
+                <Button
                   onClick={openBankWithdrawModal}
                   disabled={!usdcBalance || usdcBalance <= 0}
                   variant="success"
                   size="sm"
                 >
-                  Withdraw
+                  Withdraw to Bank
                 </Button>
               </div>
             </div>
