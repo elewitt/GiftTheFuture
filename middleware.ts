@@ -1,15 +1,59 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// OFAC sanctioned countries + United States
+// Restricted countries
 const BLOCKED_COUNTRIES = [
   "US", // United States
-  "IR", // Iran
-  "KP", // North Korea
-  "CU", // Cuba
-  "SY", // Syria
-  "RU", // Russia
+  "AF", // Afghanistan
+  "DZ", // Algeria
+  "AO", // Angola
+  "AU", // Australia
   "BY", // Belarus
+  "BE", // Belgium
+  "BO", // Bolivia
+  "BG", // Bulgaria
+  "BF", // Burkina Faso
+  "CM", // Cameroon
+  "CA", // Canada
+  "CF", // Central African Republic
+  "CI", // Côte d'Ivoire
+  "CU", // Cuba
+  "CD", // Democratic Republic of the Congo
+  "ET", // Ethiopia
+  "FR", // France
+  "HT", // Haiti
+  "IR", // Iran
+  "IQ", // Iraq
+  "IT", // Italy
+  "KE", // Kenya
+  "LA", // Laos
+  "LB", // Lebanon
+  "LY", // Libya
+  "ML", // Mali
+  "MC", // Monaco
+  "MZ", // Mozambique
+  "MM", // Myanmar (Burma)
+  "NA", // Namibia
+  "NI", // Nicaragua
+  "NE", // Niger
+  "KP", // North Korea
+  "CN", // People's Republic of China
+  "PL", // Poland
+  "RU", // Russia
+  "SG", // Singapore
+  "SO", // Somalia
+  "SS", // South Sudan
+  "SD", // Sudan
+  "CH", // Switzerland
+  "SY", // Syria
+  "TW", // Taiwan
+  "TH", // Thailand
+  "UA", // Ukraine
+  "AE", // United Arab Emirates
+  "GB", // United Kingdom
+  "VE", // Venezuela
+  "YE", // Yemen
+  "ZW", // Zimbabwe
 ];
 
 export function middleware(request: NextRequest) {
