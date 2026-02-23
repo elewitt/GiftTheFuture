@@ -13,6 +13,9 @@ import { Input } from "@/components/ui/input";
 
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
+// Helper to floor a number to 2 decimal places (avoids rounding up)
+const floorToTwo = (n: number) => Math.floor(n * 100) / 100;
+
 interface Position {
   id: string;
   marketTicker: string;
@@ -386,7 +389,7 @@ export default function DashboardPage() {
       isOpen: true,
       step: "form",
       destinationAddress: "",
-      amount: usdcBalance?.toFixed(2) || "",
+      amount: usdcBalance ? floorToTwo(usdcBalance).toFixed(2) : "",
       error: null,
       signature: null,
     });
@@ -552,7 +555,7 @@ export default function DashboardPage() {
       step: "loading",
       liquidationAddress: null,
       bankInfo: null,
-      amount: usdcBalance?.toFixed(2) || "",
+      amount: usdcBalance ? floorToTwo(usdcBalance).toFixed(2) : "",
       error: null,
       signature: null,
     });
@@ -770,7 +773,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Balance</p>
                 <p className="text-2xl font-bold text-primary">
-                  ${usdcBalance !== null ? usdcBalance.toFixed(2) : "—"} <span className="text-base font-normal text-muted-foreground">USD</span>
+                  ${usdcBalance !== null ? floorToTwo(usdcBalance).toFixed(2) : "—"} <span className="text-base font-normal text-muted-foreground">USD</span>
                 </p>
               </div>
               <div className="flex gap-2">
@@ -1489,14 +1492,14 @@ function WithdrawModal({
                   onChange={(e) => onAmountChange(e.target.value)}
                 />
                 <button
-                  onClick={() => onAmountChange(usdcBalance.toFixed(2))}
+                  onClick={() => onAmountChange(floorToTwo(usdcBalance).toFixed(2))}
                   className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-primary/20 text-primary text-xs font-medium hover:bg-primary/30 transition"
                 >
                   MAX
                 </button>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Available: ${usdcBalance.toFixed(2)} USD
+                Available: ${floorToTwo(usdcBalance).toFixed(2)} USD
               </p>
             </div>
 
@@ -1722,14 +1725,14 @@ function BankWithdrawModal({
                   onChange={(e) => onAmountChange(e.target.value)}
                 />
                 <button
-                  onClick={() => onAmountChange(usdcBalance.toFixed(2))}
+                  onClick={() => onAmountChange(floorToTwo(usdcBalance).toFixed(2))}
                   className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-primary/20 text-primary text-xs font-medium hover:bg-primary/30 transition"
                 >
                   MAX
                 </button>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Available: ${usdcBalance.toFixed(2)} USD
+                Available: ${floorToTwo(usdcBalance).toFixed(2)} USD
               </p>
             </div>
 
