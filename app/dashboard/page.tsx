@@ -128,6 +128,25 @@ export default function DashboardPage() {
   const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
   const [solBalance, setSolBalance] = useState<number | null>(null);
 
+  // Bank withdrawal modal state
+  const [bankWithdraw, setBankWithdraw] = useState<{
+    isOpen: boolean;
+    step: "loading" | "setup" | "ready" | "sending" | "done" | "error";
+    liquidationAddress: string | null;
+    bankInfo: { bankName?: string; last4?: string } | null;
+    amount: string;
+    error: string | null;
+    signature: string | null;
+  }>({
+    isOpen: false,
+    step: "loading",
+    liquidationAddress: null,
+    bankInfo: null,
+    amount: "",
+    error: null,
+    signature: null,
+  });
+
   useEffect(() => {
     if (!authenticated || !user) return;
 
@@ -523,6 +542,147 @@ export default function DashboardPage() {
     }
   }, [withdraw.destinationAddress, withdraw.amount, wallets, usdcBalance]);
 
+  // Bank withdrawal handlers
+  const openBankWithdrawModal = useCallback(async () => {
+    setBankWithdraw({
+      isOpen: true,
+      step: "loading",
+      liquidationAddress: null,
+      bankInfo: null,
+      amount: usdcBalance?.toFixed(2) || "",
+      error: null,
+      signature: null,
+    });
+
+    try {
+      // Check if user has Bridge set up
+      const res = await fetch(`/api/bridge/bank-account?privyId=${user?.id}`);
+      const data = await res.json();
+
+      if (data.hasAccount && data.liquidationAddress) {
+        setBankWithdraw((prev) => ({
+          ...prev,
+          step: "ready",
+          liquidationAddress: data.liquidationAddress,
+          bankInfo: data.accounts?.[0] ? {
+            bankName: data.accounts[0].bank_name,
+            last4: data.accounts[0].last_4,
+          } : null,
+        }));
+      } else {
+        setBankWithdraw((prev) => ({
+          ...prev,
+          step: "setup",
+        }));
+      }
+    } catch (err: any) {
+      setBankWithdraw((prev) => ({
+        ...prev,
+        step: "setup",
+      }));
+    }
+  }, [user?.id, usdcBalance]);
+
+  const closeBankWithdrawModal = () => {
+    setBankWithdraw({
+      isOpen: false,
+      step: "loading",
+      liquidationAddress: null,
+      bankInfo: null,
+      amount: "",
+      error: null,
+      signature: null,
+    });
+  };
+
+  const handleBankWithdraw = useCallback(async () => {
+    const wallet = wallets.find((w) => w.walletClientType === "privy") || wallets[0];
+    if (!wallet || !bankWithdraw.liquidationAddress) {
+      setBankWithdraw((prev) => ({ ...prev, step: "error", error: "No wallet or bank account found" }));
+      return;
+    }
+
+    const amount = parseFloat(bankWithdraw.amount);
+    if (isNaN(amount) || amount <= 0) {
+      setBankWithdraw((prev) => ({ ...prev, step: "error", error: "Invalid amount" }));
+      return;
+    }
+
+    try {
+      setBankWithdraw((prev) => ({ ...prev, step: "sending" }));
+
+      // Airdrop SOL if needed
+      try {
+        await fetch("/api/solana/airdrop-sol", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userAddress: wallet.address }),
+        });
+      } catch {}
+
+      const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+      const connection = new Connection(rpcUrl, "confirmed");
+      const senderPubkey = new PublicKey(wallet.address);
+      const destinationPubkey = new PublicKey(bankWithdraw.liquidationAddress);
+      const usdcMint = new PublicKey(USDC_MINT);
+
+      const senderATA = getAssociatedTokenAddressSync(usdcMint, senderPubkey);
+      const destinationATA = getAssociatedTokenAddressSync(usdcMint, destinationPubkey);
+
+      const tx = new Transaction();
+
+      // Check if destination ATA exists
+      const destATAInfo = await connection.getAccountInfo(destinationATA);
+      if (!destATAInfo) {
+        const { createAssociatedTokenAccountInstruction } = await import("@solana/spl-token");
+        tx.add(
+          createAssociatedTokenAccountInstruction(
+            senderPubkey,
+            destinationATA,
+            destinationPubkey,
+            usdcMint
+          )
+        );
+      }
+
+      const amountLamports = Math.floor(amount * 1_000_000);
+      tx.add(
+        createTransferInstruction(
+          senderATA,
+          destinationATA,
+          senderPubkey,
+          amountLamports
+        )
+      );
+
+      const latestBlockhash = await connection.getLatestBlockhash();
+      tx.recentBlockhash = latestBlockhash.blockhash;
+      tx.feePayer = senderPubkey;
+
+      const signedTx = await wallet.signTransaction(tx);
+      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: false,
+        maxRetries: 3,
+      });
+
+      await connection.confirmTransaction({
+        signature,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      });
+
+      setBankWithdraw((prev) => ({ ...prev, step: "done", signature }));
+      setTimeout(() => setUsdcBalance((prev) => (prev || 0) - amount), 2000);
+    } catch (err: any) {
+      console.error("Bank withdraw error:", err);
+      setBankWithdraw((prev) => ({
+        ...prev,
+        step: "error",
+        error: err.message || "Withdrawal failed",
+      }));
+    }
+  }, [bankWithdraw.liquidationAddress, bankWithdraw.amount, wallets]);
+
   if (!ready) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -613,13 +773,24 @@ export default function DashboardPage() {
                   {solBalance !== null ? `${solBalance.toFixed(4)} SOL for fees` : "Loading..."}
                 </p>
               </div>
-              <Button
-                onClick={openWithdrawModal}
-                disabled={!usdcBalance || usdcBalance <= 0}
-                variant="success"
-              >
-                Withdraw USDC
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={openWithdrawModal}
+                  disabled={!usdcBalance || usdcBalance <= 0}
+                  variant="outline"
+                  size="sm"
+                >
+                  To Wallet
+                </Button>
+                <Button
+                  onClick={openBankWithdrawModal}
+                  disabled={!usdcBalance || usdcBalance <= 0}
+                  variant="success"
+                  size="sm"
+                >
+                  To Bank
+                </Button>
+              </div>
             </div>
             <div className="pt-3 border-t border-border">
               <p className="text-[10px] text-muted-foreground mb-1">Your wallet address</p>
@@ -737,6 +908,17 @@ export default function DashboardPage() {
           onAddressChange={(address) => setWithdraw((prev) => ({ ...prev, destinationAddress: address }))}
           onConfirm={handleWithdraw}
           onClose={closeWithdrawModal}
+        />
+      )}
+
+      {/* Bank Withdraw Modal */}
+      {bankWithdraw.isOpen && (
+        <BankWithdrawModal
+          state={bankWithdraw}
+          usdcBalance={usdcBalance || 0}
+          onAmountChange={(amount) => setBankWithdraw((prev) => ({ ...prev, amount }))}
+          onConfirm={handleBankWithdraw}
+          onClose={closeBankWithdrawModal}
         />
       )}
     </div>
@@ -1414,6 +1596,234 @@ function WithdrawModal({
         className="relative w-full max-w-md bg-card border border-border rounded-2xl p-6 shadow-2xl"
       >
         {(withdraw.step === "form" || withdraw.step === "error" || withdraw.step === "done") && (
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1 text-muted-foreground hover:text-foreground transition"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+        {stepContent()}
+      </motion.div>
+    </div>
+  );
+}
+
+function BankWithdrawModal({
+  state,
+  usdcBalance,
+  onAmountChange,
+  onConfirm,
+  onClose,
+}: {
+  state: {
+    step: "loading" | "setup" | "ready" | "sending" | "done" | "error";
+    liquidationAddress: string | null;
+    bankInfo: { bankName?: string; last4?: string } | null;
+    amount: string;
+    error: string | null;
+    signature: string | null;
+  };
+  usdcBalance: number;
+  onAmountChange: (amount: string) => void;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const stepContent = () => {
+    switch (state.step) {
+      case "loading":
+        return (
+          <div className="text-center py-8">
+            <div className="w-12 h-12 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-foreground mb-2">Checking Bank Account</h3>
+            <p className="text-sm text-muted-foreground">Loading your withdrawal options...</p>
+          </div>
+        );
+
+      case "setup":
+        return (
+          <div className="text-center py-4">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">🏦</span>
+            </div>
+            <h3 className="text-xl font-bold text-foreground mb-2">Set Up Bank Withdrawals</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              To withdraw USDC directly to your bank account, you need to complete a one-time setup with our payment partner Bridge.
+            </p>
+
+            <div className="p-4 rounded-xl bg-secondary/50 mb-6 text-left">
+              <h4 className="text-sm font-semibold text-foreground mb-2">What you will need:</h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• US bank account</li>
+                <li>• Government ID for verification</li>
+                <li>• Takes about 2 minutes</li>
+              </ul>
+            </div>
+
+            <p className="text-xs text-muted-foreground mb-4">
+              Bridge is a Stripe company that handles crypto-to-bank transfers securely.
+            </p>
+
+            <div className="flex gap-3">
+              <Button onClick={onClose} variant="secondary" className="flex-1">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => window.open("https://www.bridge.xyz", "_blank")}
+                className="flex-1"
+              >
+                Set Up Bank Account
+              </Button>
+            </div>
+
+            <p className="text-[10px] text-muted-foreground mt-4">
+              Coming soon: Direct bank account linking. For now, you can withdraw to a Solana wallet and use an exchange.
+            </p>
+          </div>
+        );
+
+      case "ready":
+        return (
+          <>
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">🏦</span>
+              </div>
+              <h3 className="text-xl font-bold text-foreground mb-2">Withdraw to Bank</h3>
+              <p className="text-sm text-muted-foreground">
+                Send USDC to your linked bank account
+              </p>
+            </div>
+
+            {state.bankInfo && (
+              <div className="p-3 rounded-xl bg-secondary/50 mb-4">
+                <p className="text-xs text-muted-foreground">Linked Bank Account</p>
+                <p className="text-sm font-medium text-foreground">
+                  {state.bankInfo.bankName || "Bank"} ••••{state.bankInfo.last4 || "****"}
+                </p>
+              </div>
+            )}
+
+            <div className="mb-4">
+              <label className="block text-xs text-muted-foreground uppercase tracking-wide mb-2">
+                Amount (USDC)
+              </label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max={usdcBalance}
+                  placeholder="0.00"
+                  value={state.amount}
+                  onChange={(e) => onAmountChange(e.target.value)}
+                />
+                <button
+                  onClick={() => onAmountChange(usdcBalance.toFixed(2))}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-primary/20 text-primary text-xs font-medium hover:bg-primary/30 transition"
+                >
+                  MAX
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Available: ${usdcBalance.toFixed(2)} USDC
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-6">
+              <p className="text-xs text-amber-600">
+                <strong>Processing time:</strong> Funds typically arrive within 1-2 business days.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <Button onClick={onClose} variant="secondary" className="flex-1">
+                Cancel
+              </Button>
+              <Button
+                onClick={onConfirm}
+                disabled={!state.amount || parseFloat(state.amount) <= 0}
+                variant="success"
+                className="flex-1"
+              >
+                Withdraw to Bank
+              </Button>
+            </div>
+          </>
+        );
+
+      case "sending":
+        return (
+          <div className="text-center py-8">
+            <div className="w-12 h-12 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-foreground mb-2">Processing Withdrawal</h3>
+            <p className="text-sm text-muted-foreground">Please approve the transaction in your wallet...</p>
+          </div>
+        );
+
+      case "done":
+        return (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">✅</span>
+            </div>
+            <h3 className="text-xl font-bold text-foreground mb-2">Withdrawal Initiated!</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Your USDC has been sent. Funds will arrive in your bank within 1-2 business days.
+            </p>
+            {state.signature && (
+              <a
+                href={`https://solscan.io/tx/${state.signature}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mb-4"
+              >
+                <Button variant="secondary" size="sm">
+                  View Transaction →
+                </Button>
+              </a>
+            )}
+            <Button onClick={onClose} variant="secondary" className="w-full">
+              Close
+            </Button>
+          </div>
+        );
+
+      case "error":
+        return (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">❌</span>
+            </div>
+            <h3 className="text-xl font-bold text-foreground mb-2">Withdrawal Failed</h3>
+            <p className="text-sm text-destructive mb-6">{state.error}</p>
+            <div className="flex gap-3">
+              <Button onClick={onClose} variant="secondary" className="flex-1">
+                Close
+              </Button>
+              <Button onClick={onConfirm} variant="success" className="flex-1">
+                Try Again
+              </Button>
+            </div>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={["loading", "setup", "ready", "error", "done"].includes(state.step) ? onClose : undefined}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative w-full max-w-md bg-card border border-border rounded-2xl p-6 shadow-2xl"
+      >
+        {["setup", "ready", "error", "done"].includes(state.step) && (
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-1 text-muted-foreground hover:text-foreground transition"
