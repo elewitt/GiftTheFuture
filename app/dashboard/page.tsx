@@ -128,6 +128,9 @@ export default function DashboardPage() {
   const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
   const [solBalance, setSolBalance] = useState<number | null>(null);
 
+  // Wallet address modal
+  const [showWalletAddress, setShowWalletAddress] = useState(false);
+
   // Bank withdrawal modal state
   const [bankWithdraw, setBankWithdraw] = useState<{
     isOpen: boolean;
@@ -414,7 +417,7 @@ export default function DashboardPage() {
     }
 
     if (amount > (usdcBalance || 0)) {
-      setWithdraw((prev) => ({ ...prev, step: "error", error: "Insufficient USDC balance" }));
+      setWithdraw((prev) => ({ ...prev, step: "error", error: "Insufficient balance" }));
       return;
     }
 
@@ -529,7 +532,7 @@ export default function DashboardPage() {
       if (errorMessage.includes("debit an account") || errorMessage.includes("no record of a prior credit")) {
         errorMessage = "Your wallet doesn't have enough SOL for transaction fees. Please add at least 0.01 SOL to your wallet.";
       } else if (errorMessage.includes("insufficient funds") || errorMessage.includes("Insufficient")) {
-        errorMessage = "Insufficient USDC balance for this withdrawal.";
+        errorMessage = "Insufficient balance for this withdrawal.";
       } else if (errorMessage.includes("simulation failed")) {
         errorMessage = "Transaction simulation failed. Please check your wallet balance and try again.";
       }
@@ -763,24 +766,20 @@ export default function DashboardPage() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="mb-6 p-5 rounded-2xl bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/20"
           >
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Wallet Balance</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Balance</p>
                 <p className="text-2xl font-bold text-primary">
-                  ${usdcBalance !== null ? usdcBalance.toFixed(2) : "—"} <span className="text-base font-normal text-muted-foreground">USDC</span>
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {solBalance !== null ? `${solBalance.toFixed(4)} SOL for fees` : "Loading..."}
+                  ${usdcBalance !== null ? usdcBalance.toFixed(2) : "—"} <span className="text-base font-normal text-muted-foreground">USD</span>
                 </p>
               </div>
               <div className="flex gap-2">
                 <Button
-                  onClick={openWithdrawModal}
-                  disabled={!usdcBalance || usdcBalance <= 0}
+                  onClick={() => setShowWalletAddress(true)}
                   variant="outline"
                   size="sm"
                 >
-                  To Wallet
+                  View Wallet
                 </Button>
                 <Button
                   onClick={openBankWithdrawModal}
@@ -788,15 +787,9 @@ export default function DashboardPage() {
                   variant="success"
                   size="sm"
                 >
-                  To Bank
+                  Withdraw
                 </Button>
               </div>
-            </div>
-            <div className="pt-3 border-t border-border">
-              <p className="text-[10px] text-muted-foreground mb-1">Your wallet address</p>
-              <p className="text-xs text-foreground font-mono break-all">
-                {wallets.find((w) => w.walletClientType === "privy")?.address || wallets[0]?.address}
-              </p>
             </div>
           </motion.div>
         )}
@@ -919,6 +912,14 @@ export default function DashboardPage() {
           onAmountChange={(amount) => setBankWithdraw((prev) => ({ ...prev, amount }))}
           onConfirm={handleBankWithdraw}
           onClose={closeBankWithdrawModal}
+        />
+      )}
+
+      {/* Wallet Address Modal */}
+      {showWalletAddress && (
+        <WalletAddressModal
+          address={wallets.find((w) => w.walletClientType === "privy")?.address || wallets[0]?.address || ""}
+          onClose={() => setShowWalletAddress(false)}
         />
       )}
     </div>
@@ -1287,7 +1288,7 @@ function CashoutModal({
               </div>
               <h3 className="text-xl font-bold text-foreground mb-2">Cash Out Position</h3>
               <p className="text-sm text-muted-foreground">
-                Sell your shares and receive USDC to your wallet
+                Sell your shares and receive cash to your wallet
               </p>
             </div>
 
@@ -1312,7 +1313,7 @@ function CashoutModal({
               <div className="flex items-center justify-between">
                 <span className="text-sm text-primary">You will receive</span>
                 <span className="text-xl font-bold text-primary">
-                  ~${position.currentValue.toFixed(2)} USDC
+                  ~${position.currentValue.toFixed(2)} USD
                 </span>
               </div>
               <p className="text-[10px] text-primary/60 mt-1">
@@ -1364,7 +1365,7 @@ function CashoutModal({
             </div>
             <h3 className="text-xl font-bold text-foreground mb-2">Cash Out Complete!</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              You received <span className="text-primary font-semibold">${cashout.usdcReceived?.toFixed(2)} USDC</span>
+              You received <span className="text-primary font-semibold">${cashout.usdcReceived?.toFixed(2)} USD</span>
             </p>
             {cashout.signature && (
               <a
@@ -1454,9 +1455,9 @@ function WithdrawModal({
               <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">💸</span>
               </div>
-              <h3 className="text-xl font-bold text-foreground mb-2">Withdraw USDC</h3>
+              <h3 className="text-xl font-bold text-foreground mb-2">Withdraw to Wallet</h3>
               <p className="text-sm text-muted-foreground">
-                Send USDC to any Solana wallet
+                Send funds to any Solana wallet
               </p>
             </div>
 
@@ -1475,7 +1476,7 @@ function WithdrawModal({
 
             <div className="mb-4">
               <label className="block text-xs text-muted-foreground uppercase tracking-wide mb-2">
-                Amount (USDC)
+                Amount (USD)
               </label>
               <div className="relative">
                 <Input
@@ -1495,7 +1496,7 @@ function WithdrawModal({
                 </button>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Available: ${usdcBalance.toFixed(2)} USDC
+                Available: ${usdcBalance.toFixed(2)} USD
               </p>
             </div>
 
@@ -1543,7 +1544,7 @@ function WithdrawModal({
             </div>
             <h3 className="text-xl font-bold text-foreground mb-2">Withdrawal Complete!</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Sent <span className="text-primary font-semibold">${withdraw.amount} USDC</span>
+              Sent <span className="text-primary font-semibold">${withdraw.amount} USD</span>
             </p>
             {withdraw.signature && (
               <a
@@ -1650,7 +1651,7 @@ function BankWithdrawModal({
             </div>
             <h3 className="text-xl font-bold text-foreground mb-2">Set Up Bank Withdrawals</h3>
             <p className="text-sm text-muted-foreground mb-6">
-              To withdraw USDC directly to your bank account, you need to complete a one-time setup with our payment partner Bridge.
+              To withdraw funds directly to your bank account, you need to complete a one-time setup with our payment partner Bridge.
             </p>
 
             <div className="p-4 rounded-xl bg-secondary/50 mb-6 text-left">
@@ -1693,7 +1694,7 @@ function BankWithdrawModal({
               </div>
               <h3 className="text-xl font-bold text-foreground mb-2">Withdraw to Bank</h3>
               <p className="text-sm text-muted-foreground">
-                Send USDC to your linked bank account
+                Send funds to your linked bank account
               </p>
             </div>
 
@@ -1708,7 +1709,7 @@ function BankWithdrawModal({
 
             <div className="mb-4">
               <label className="block text-xs text-muted-foreground uppercase tracking-wide mb-2">
-                Amount (USDC)
+                Amount (USD)
               </label>
               <div className="relative">
                 <Input
@@ -1728,7 +1729,7 @@ function BankWithdrawModal({
                 </button>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Available: ${usdcBalance.toFixed(2)} USDC
+                Available: ${usdcBalance.toFixed(2)} USD
               </p>
             </div>
 
@@ -1771,7 +1772,7 @@ function BankWithdrawModal({
             </div>
             <h3 className="text-xl font-bold text-foreground mb-2">Withdrawal Initiated!</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Your USDC has been sent. Funds will arrive in your bank within 1-2 business days.
+              Your funds have been sent. They will arrive in your bank within 1-2 business days.
             </p>
             {state.signature && (
               <a
@@ -1834,6 +1835,102 @@ function BankWithdrawModal({
           </button>
         )}
         {stepContent()}
+      </motion.div>
+    </div>
+  );
+}
+
+
+function WalletAddressModal({
+  address,
+  onClose,
+}: {
+  address: string;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  // Generate QR code URL using a free QR code API
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(address)}&bgcolor=ffffff&color=000000`;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative w-full max-w-sm bg-card border border-border rounded-2xl p-6 shadow-2xl"
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-1 text-muted-foreground hover:text-foreground transition"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        <div className="text-center">
+          <h3 className="text-lg font-bold text-foreground mb-4">Your Wallet Address</h3>
+
+          {/* QR Code */}
+          <div className="bg-white p-4 rounded-xl inline-block mb-4">
+            <img
+              src={qrCodeUrl}
+              alt="Wallet QR Code"
+              width={200}
+              height={200}
+              className="rounded-lg"
+            />
+          </div>
+
+          {/* Address */}
+          <div className="p-3 rounded-xl bg-secondary/50 mb-4">
+            <p className="text-xs text-foreground font-mono break-all leading-relaxed">
+              {address}
+            </p>
+          </div>
+
+          {/* Copy Button */}
+          <Button
+            onClick={handleCopy}
+            variant={copied ? "secondary" : "default"}
+            className="w-full"
+          >
+            {copied ? (
+              <>
+                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Copied!
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Copy Address
+              </>
+            )}
+          </Button>
+
+          <p className="text-[10px] text-muted-foreground mt-4">
+            Use this address to receive funds on Solana
+          </p>
+        </div>
       </motion.div>
     </div>
   );
