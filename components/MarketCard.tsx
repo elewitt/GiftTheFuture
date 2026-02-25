@@ -40,6 +40,9 @@ export function MarketCard({ market, index = 0, showRank = false }: MarketCardPr
   const noPercent = 100 - yesPercent;
   const emoji = categoryEmojis[market.category] || "📊";
 
+  // Detect if this is a multi-outcome market (ticker differs from eventTicker)
+  const isMultiOutcome = market.eventTicker && market.ticker !== market.eventTicker;
+
   const formatVolume = (vol: number) => {
     if (vol >= 1_000_000) return `${(vol / 1_000_000).toFixed(1)}M`;
     if (vol >= 1_000) return `${(vol / 1_000).toFixed(0)}K`;
@@ -74,24 +77,41 @@ export function MarketCard({ market, index = 0, showRank = false }: MarketCardPr
           </div>
 
           <div>
-            {/* Probability bar */}
-            <div className="mb-2 flex h-2 w-full overflow-hidden rounded-full bg-secondary">
-              <div
-                className="rounded-full transition-all"
-                style={{ width: `${yesPercent}%`, backgroundColor: "hsl(var(--yes))" }}
-              />
-              <div
-                className="rounded-full transition-all"
-                style={{ width: `${noPercent}%`, backgroundColor: "hsl(var(--no))" }}
-              />
-            </div>
-
-            <div className="flex items-center justify-between text-sm font-semibold">
-              <span style={{ color: "hsl(var(--yes))" }}>Yes {yesPercent}¢</span>
-              <span style={{ color: "hsl(var(--no))" }}>No {noPercent}¢</span>
-            </div>
-
-            <p className="mt-3 text-xs text-muted-foreground truncate">{market.ticker}</p>
+            {isMultiOutcome ? (
+              // Multi-outcome: show single probability bar
+              <>
+                <div className="mb-2 flex h-2 w-full overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className="rounded-full transition-all bg-primary"
+                    style={{ width: `${yesPercent}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-semibold text-primary">{yesPercent}% chance</span>
+                  <span className="text-xs text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded">
+                    Multi-outcome
+                  </span>
+                </div>
+              </>
+            ) : (
+              // Binary: show Yes/No bar
+              <>
+                <div className="mb-2 flex h-2 w-full overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className="rounded-full transition-all"
+                    style={{ width: `${yesPercent}%`, backgroundColor: "hsl(var(--yes))" }}
+                  />
+                  <div
+                    className="rounded-full transition-all"
+                    style={{ width: `${noPercent}%`, backgroundColor: "hsl(var(--no))" }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-sm font-semibold">
+                  <span style={{ color: "hsl(var(--yes))" }}>Yes {yesPercent}¢</span>
+                  <span style={{ color: "hsl(var(--no))" }}>No {noPercent}¢</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </Link>

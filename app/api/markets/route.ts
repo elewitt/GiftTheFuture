@@ -76,8 +76,23 @@ export async function GET(req: Request) {
     // Sort by volume (highest first)
     allMarkets.sort((a, b) => (b.volume || 0) - (a.volume || 0));
 
+    // Deduplicate multi-outcome events: keep only one market per eventTicker
+    // This prevents showing "When will Bitcoin hit $150k?" 4 times
+    const seenEvents = new Set<string>();
+    const deduplicatedMarkets = allMarkets.filter(m => {
+      const eventKey = m.eventTicker || m.ticker;
+      // If this is a multi-outcome market (ticker != eventTicker), dedupe by event
+      if (m.eventTicker && m.ticker !== m.eventTicker) {
+        if (seenEvents.has(eventKey)) {
+          return false; // Skip duplicate
+        }
+        seenEvents.add(eventKey);
+      }
+      return true;
+    });
+
     // Transform to consistent format
-    const markets = allMarkets.slice(0, limit).map(transformDFlowMarket);
+    const markets = deduplicatedMarkets.slice(0, limit).map(transformDFlowMarket);
 
     return NextResponse.json({
       markets,
