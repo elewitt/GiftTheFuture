@@ -16,6 +16,7 @@ interface Market {
   volume24h: number;
   closeTime: string;
   isMultiOutcome?: boolean;
+  topOutcomes?: { label: string; probability: number }[];
 }
 
 interface MarketCardProps {
@@ -78,22 +79,30 @@ export function MarketCard({ market, index = 0, showRank = false }: MarketCardPr
           </div>
 
           <div>
-            {isMultiOutcome ? (
-              // Multi-outcome: show single probability bar
-              <>
-                <div className="mb-2 flex h-2 w-full overflow-hidden rounded-full bg-secondary">
-                  <div
-                    className="rounded-full transition-all bg-primary"
-                    style={{ width: `${yesPercent}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-semibold text-primary">{yesPercent}% chance</span>
-                  <span className="text-xs text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded">
-                    Multi-outcome
-                  </span>
-                </div>
-              </>
+            {isMultiOutcome && market.topOutcomes ? (
+              // Multi-outcome: show top 2 outcomes
+              <div className="space-y-2">
+                {market.topOutcomes.map((outcome, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs text-foreground truncate pr-2">
+                          {outcome.label}
+                        </span>
+                        <span className="text-xs font-bold text-primary flex-shrink-0">
+                          {outcome.probability}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{ width: `${outcome.probability}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               // Binary: show Yes/No bar
               <>

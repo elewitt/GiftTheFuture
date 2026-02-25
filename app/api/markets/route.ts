@@ -26,6 +26,42 @@ interface DFlowMarketFull {
 }
 
 /**
+ * Extract a meaningful label from ticker for multi-outcome events
+ */
+function getOutcomeLabel(ticker: string, title: string, allMarkets: DFlowMarketFull[]): string {
+  // Check if all markets have the same title
+  const allSameTitle = allMarkets.every(m => m.title === allMarkets[0]?.title);
+
+  if (!allSameTitle) {
+    // Titles are different - use a shortened version
+    return title.length > 30 ? title.substring(0, 27) + "..." : title;
+  }
+
+  // Titles are the same - extract date from ticker
+  const dateMatch = ticker.match(/(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(\d{2})/i);
+  if (dateMatch) {
+    const [, year, month, day] = dateMatch;
+    const monthNames: Record<string, string> = {
+      JAN: "Jan", FEB: "Feb", MAR: "Mar", APR: "Apr",
+      MAY: "May", JUN: "Jun", JUL: "Jul", AUG: "Aug",
+      SEP: "Sep", OCT: "Oct", NOV: "Nov", DEC: "Dec"
+    };
+    const monthName = monthNames[month.toUpperCase()] || month;
+    return `By ${monthName} ${parseInt(day)}, 20${year}`;
+  }
+
+  // Try to extract name from title (e.g., "nominate X as Fed Chair")
+  const nameMatch = title.match(/nominate\s+(\w+\s+\w+)/i);
+  if (nameMatch) {
+    return nameMatch[1];
+  }
+
+  // Fallback: last part of ticker
+  const parts = ticker.split("-");
+  return parts[parts.length - 1] || title.substring(0, 20);
+}
+
+/**
  * GET /api/markets
  *
  * Fetch markets from DFlow API (these are the markets we can actually trade).
@@ -100,11 +136,44 @@ export async function GET(req: Request) {
       return true;
     });
 
-    // Transform to consistent format, marking multi-outcome events
-    const markets = deduplicatedMarkets.slice(0, limit).map(m => ({
-      ...transformDFlowMarket(m),
-      isMultiOutcome: (eventCounts.get(m.eventTicker || m.ticker) || 1) > 1,
-    }));
+    // Group all markets by eventTicker for getting top outcomes
+    const eventMarkets = new Map<string, DFlowMarketFull[]>();
+    allMarkets.forEach(m => {
+      const eventKey = m.eventTicker || m.ticker;
+      if (!eventMarkets.has(eventKey)) {
+        eventMarkets.set(eventKey, []);
+      }
+      eventMarkets.get(eventKey)!.push(m);
+    });
+
+    // Transform to consistent format, including top outcomes for multi-outcome events
+    const markets = deduplicatedMarkets.slice(0, limit).map(m => {
+      const eventKey = m.eventTicker || m.ticker;
+      const siblings = eventMarkets.get(eventKey) || [m];
+      const isMultiOutcome = siblings.length > 1;
+
+      // Get top 2 outcomes sorted by probability
+      const topOutcomes = isMultiOutcome
+        ? siblings
+            .map(s => ({
+              ticker: s.ticker,
+              title: s.title,
+              yesPrice: parseFloat(s.yesAsk || s.yesBid || "0.5"),
+            }))
+            .sort((a, b) => b.yesPrice - a.yesPrice)
+            .slice(0, 2)
+            .map(o => ({
+              label: getOutcomeLabel(o.ticker, o.title, siblings),
+              probability: Math.round(o.yesPrice * 100),
+            }))
+        : null;
+
+      return {
+        ...transformDFlowMarket(m),
+        isMultiOutcome,
+        topOutcomes,
+      };
+    });
 
     return NextResponse.json({
       markets,
