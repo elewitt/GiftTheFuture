@@ -112,22 +112,33 @@ export async function GET(req: Request) {
     // Sort by volume (highest first)
     allMarkets.sort((a, b) => (b.volume || 0) - (a.volume || 0));
 
-    // Count how many markets share each eventTicker
-    const eventCounts = new Map<string, number>();
+    // Group markets by eventTicker and check if they have the same title
+    const eventGroups = new Map<string, DFlowMarketFull[]>();
     allMarkets.forEach(m => {
       const eventKey = m.eventTicker || m.ticker;
-      eventCounts.set(eventKey, (eventCounts.get(eventKey) || 0) + 1);
+      if (!eventGroups.has(eventKey)) {
+        eventGroups.set(eventKey, []);
+      }
+      eventGroups.get(eventKey)!.push(m);
     });
 
-    // Deduplicate multi-outcome events: keep only one market per eventTicker
+    // Determine which events are true multi-outcome (same title across all markets)
+    const trueMultiOutcomeEvents = new Set<string>();
+    eventGroups.forEach((markets, eventKey) => {
+      if (markets.length > 1 && markets.every(m => m.title === markets[0].title)) {
+        trueMultiOutcomeEvents.add(eventKey);
+      }
+    });
+
+    // Deduplicate only true multi-outcome events
     // This prevents showing "When will Bitcoin hit $150k?" 4 times
+    // But keeps separate markets like "Arizona vs Baylor - Spread" and "Arizona vs Baylor - ML"
     const seenEvents = new Set<string>();
     const deduplicatedMarkets = allMarkets.filter(m => {
       const eventKey = m.eventTicker || m.ticker;
-      const count = eventCounts.get(eventKey) || 1;
 
-      // Only dedupe if there are actually multiple markets for this event
-      if (count > 1) {
+      // Only dedupe if this is a true multi-outcome event (all same title)
+      if (trueMultiOutcomeEvents.has(eventKey)) {
         if (seenEvents.has(eventKey)) {
           return false; // Skip duplicate
         }
@@ -150,9 +161,14 @@ export async function GET(req: Request) {
     const markets = deduplicatedMarkets.slice(0, limit).map(m => {
       const eventKey = m.eventTicker || m.ticker;
       const siblings = eventMarkets.get(eventKey) || [m];
-      const isMultiOutcome = siblings.length > 1;
 
-      // Get top 2 outcomes sorted by probability
+      // Only consider it multi-outcome if:
+      // 1. Multiple markets share the eventTicker
+      // 2. AND all markets have the same title (true multi-outcome, not just related markets)
+      const allSameTitle = siblings.length > 1 && siblings.every(s => s.title === siblings[0].title);
+      const isMultiOutcome = allSameTitle;
+
+      // Get top 2 outcomes sorted by probability (only for true multi-outcome)
       const topOutcomes = isMultiOutcome
         ? siblings
             .map(s => ({
