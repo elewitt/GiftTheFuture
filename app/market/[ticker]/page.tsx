@@ -280,48 +280,61 @@ export default function MarketPage() {
               <span className="text-xs font-medium tracking-[0.08em] uppercase text-primary px-2 py-1 rounded bg-primary/10">
                 {market.category}
               </span>
-              <span className="text-xs text-muted-foreground">•</span>
-              <span className="text-xs text-muted-foreground font-mono">{market.ticker}</span>
+              {isMultiOutcome && (
+                <>
+                  <span className="text-xs text-muted-foreground">•</span>
+                  <span className="text-xs font-medium tracking-[0.08em] uppercase text-amber-600 px-2 py-1 rounded bg-amber-500/10">
+                    {outcomes.length} Outcomes
+                  </span>
+                </>
+              )}
             </div>
 
             <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight mb-2">
               {market.title}
             </h1>
 
-            {market.subtitle && (
+            {isMultiOutcome ? (
+              <p className="text-muted-foreground text-sm mb-6">
+                Select which outcome you think will happen
+              </p>
+            ) : market.subtitle ? (
               <p className="text-muted-foreground text-sm mb-6">{market.subtitle}</p>
-            )}
+            ) : null}
 
             {/* Large Price Display */}
             <div className="bg-card border border-border rounded-2xl p-6 mb-6">
               {isMultiOutcome ? (
                 // Multi-outcome: show all outcomes with prices
                 <>
-                  <p className="text-xs text-muted-foreground uppercase mb-3">
-                    {outcomes.length} Possible Outcomes
+                  <p className="text-xs text-muted-foreground uppercase mb-4">
+                    Outcome Probabilities
                   </p>
-                  <div className="space-y-2">
-                    {outcomes.slice(0, 5).map((outcome) => (
-                      <div key={outcome.ticker} className="flex items-center gap-3">
-                        <div className="flex-1">
-                          <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-primary transition-all"
-                              style={{ width: `${outcome.yesPrice * 100}%` }}
-                            />
-                          </div>
+                  <div className="space-y-3">
+                    {outcomes
+                      .sort((a, b) => b.yesPrice - a.yesPrice)
+                      .slice(0, 6)
+                      .map((outcome) => (
+                      <div key={outcome.ticker}>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-sm font-medium text-foreground">
+                            {getOutcomeLabel(outcome, outcomes)}
+                          </span>
+                          <span className="text-sm font-bold text-primary">
+                            {Math.round(outcome.yesPrice * 100)}%
+                          </span>
                         </div>
-                        <span className="text-sm font-bold text-primary w-12 text-right">
-                          {Math.round(outcome.yesPrice * 100)}¢
-                        </span>
-                        <span className="text-xs text-muted-foreground w-32 truncate">
-                          {getOutcomeLabel(outcome, outcomes)}
-                        </span>
+                        <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-primary transition-all"
+                            style={{ width: `${outcome.yesPrice * 100}%` }}
+                          />
+                        </div>
                       </div>
                     ))}
-                    {outcomes.length > 5 && (
+                    {outcomes.length > 6 && (
                       <p className="text-xs text-muted-foreground text-center pt-2">
-                        +{outcomes.length - 5} more outcomes
+                        +{outcomes.length - 6} more outcomes available below
                       </p>
                     )}
                   </div>
