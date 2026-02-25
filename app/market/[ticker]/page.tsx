@@ -36,6 +36,52 @@ interface MarketResponse {
   outcomes: MarketDetail[];
 }
 
+/**
+ * Extract a meaningful label from a ticker for multi-outcome events.
+ * E.g., "KXBTCMAX150-25-26MAY31-149999.99" → "By May 31, 2026"
+ * E.g., "KXFEDCHAIRNOM-29-JS" → "Judy Shelton" (from title)
+ */
+function getOutcomeLabel(outcome: MarketDetail, allOutcomes: MarketDetail[]): string {
+  // Check if all outcomes have the same title
+  const allSameTitle = allOutcomes.every(o => o.title === allOutcomes[0]?.title);
+
+  if (!allSameTitle) {
+    // Titles are different - use the title
+    return outcome.title;
+  }
+
+  // Titles are the same - try to extract date from ticker
+  const ticker = outcome.ticker;
+
+  // Pattern: Look for date codes like 26MAY31, 26FEB28, 26MAR31
+  const dateMatch = ticker.match(/(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(\d{2})/i);
+  if (dateMatch) {
+    const [, year, month, day] = dateMatch;
+    const monthNames: Record<string, string> = {
+      JAN: 'January', FEB: 'February', MAR: 'March', APR: 'April',
+      MAY: 'May', JUN: 'June', JUL: 'July', AUG: 'August',
+      SEP: 'September', OCT: 'October', NOV: 'November', DEC: 'December'
+    };
+    const monthName = monthNames[month.toUpperCase()] || month;
+    const fullYear = `20${year}`;
+    return `By ${monthName} ${parseInt(day)}, ${fullYear}`;
+  }
+
+  // Pattern: Look for suffix like -JS, -KW (initials)
+  const suffixMatch = ticker.match(/-([A-Z]{2,})$/);
+  if (suffixMatch) {
+    // Try to extract the name from the title
+    const nameMatch = outcome.title.match(/nominate\s+(\w+\s+\w+)/i);
+    if (nameMatch) {
+      return nameMatch[1];
+    }
+  }
+
+  // Fallback: Use the last part of the ticker
+  const parts = ticker.split('-');
+  return parts[parts.length - 1] || outcome.title;
+}
+
 export default function MarketPage() {
   const params = useParams();
   const ticker = params.ticker as string;
@@ -269,7 +315,7 @@ export default function MarketPage() {
                           {Math.round(outcome.yesPrice * 100)}¢
                         </span>
                         <span className="text-xs text-muted-foreground w-32 truncate">
-                          {outcome.title}
+                          {getOutcomeLabel(outcome, outcomes)}
                         </span>
                       </div>
                     ))}
@@ -414,7 +460,7 @@ export default function MarketPage() {
                               ? "text-primary"
                               : "text-foreground"
                           }`}>
-                            {outcome.title}
+                            {getOutcomeLabel(outcome, outcomes)}
                           </span>
                           <span className={`text-sm font-bold ${
                             selectedOutcome?.ticker === outcome.ticker
