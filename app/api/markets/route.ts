@@ -165,24 +165,35 @@ export async function GET(req: Request) {
       // Only consider it multi-outcome if:
       // 1. Multiple markets share the eventTicker
       // 2. AND all markets have the same title (true multi-outcome, not just related markets)
+      // 3. AND the extracted labels are actually different
       const allSameTitle = siblings.length > 1 && siblings.every(s => s.title === siblings[0].title);
-      const isMultiOutcome = allSameTitle;
 
-      // Get top 2 outcomes sorted by probability (only for true multi-outcome)
-      const topOutcomes = isMultiOutcome
-        ? siblings
-            .map(s => ({
-              ticker: s.ticker,
-              title: s.title,
-              yesPrice: parseFloat(s.yesAsk || s.yesBid || "0.5"),
-            }))
-            .sort((a, b) => b.yesPrice - a.yesPrice)
-            .slice(0, 2)
-            .map(o => ({
-              label: getOutcomeLabel(o.ticker, o.title, siblings),
-              probability: Math.round(o.yesPrice * 100),
-            }))
-        : null;
+      // Pre-compute labels to check if they're different
+      let topOutcomes: { label: string; probability: number }[] | null = null;
+      let isMultiOutcome = false;
+
+      if (allSameTitle) {
+        const potentialOutcomes = siblings
+          .map(s => ({
+            ticker: s.ticker,
+            title: s.title,
+            yesPrice: parseFloat(s.yesAsk || s.yesBid || "0.5"),
+            label: getOutcomeLabel(s.ticker, s.title, siblings),
+          }))
+          .sort((a, b) => b.yesPrice - a.yesPrice);
+
+        // Check if labels are actually different
+        const uniqueLabels = new Set(potentialOutcomes.map(o => o.label));
+
+        if (uniqueLabels.size > 1) {
+          // Labels are different - this is a true multi-outcome event
+          isMultiOutcome = true;
+          topOutcomes = potentialOutcomes.slice(0, 2).map(o => ({
+            label: o.label,
+            probability: Math.round(o.yesPrice * 100),
+          }));
+        }
+      }
 
       return {
         ...transformDFlowMarket(m),
