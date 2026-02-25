@@ -29,6 +29,7 @@ interface DFlowMarketFull {
  * GET /api/markets/[ticker]
  *
  * Fetch a single market from DFlow by ticker.
+ * Also fetches sibling markets (same eventTicker) for multi-outcome events.
  */
 export async function GET(
   req: Request,
@@ -41,6 +42,7 @@ export async function GET(
       return NextResponse.json({ error: "Missing ticker" }, { status: 400 });
     }
 
+    // Fetch the specific market
     const res = await fetch(`${DFLOW_API}/api/v1/market/${encodeURIComponent(ticker)}`, {
       headers: getHeaders(),
       next: { revalidate: 10 },
@@ -54,9 +56,44 @@ export async function GET(
     }
 
     const market: DFlowMarketFull = await res.json();
+    const transformedMarket = transformDFlowMarket(market);
+
+    // Fetch sibling markets (same event) if this is part of a multi-outcome event
+    let siblingMarkets: ReturnType<typeof transformDFlowMarket>[] = [];
+
+    if (market.eventTicker) {
+      try {
+        const allMarketsRes = await fetch(`${DFLOW_API}/api/v1/markets?status=active&limit=200`, {
+          headers: getHeaders(),
+          next: { revalidate: 30 },
+        });
+
+        if (allMarketsRes.ok) {
+          const data = await allMarketsRes.json();
+          const allMarkets: DFlowMarketFull[] = data.markets || data || [];
+
+          // Find markets with the same eventTicker
+          const siblings = allMarkets.filter(m =>
+            m.eventTicker === market.eventTicker && m.ticker !== market.ticker
+          );
+
+          siblingMarkets = siblings.map(transformDFlowMarket);
+        }
+      } catch (e) {
+        console.error("Failed to fetch sibling markets:", e);
+      }
+    }
+
+    // Determine if this is a multi-outcome event
+    const isMultiOutcome = siblingMarkets.length > 0;
+    const allOutcomes = isMultiOutcome
+      ? [transformedMarket, ...siblingMarkets].sort((a, b) => b.yesPrice - a.yesPrice)
+      : [];
 
     return NextResponse.json({
-      market: transformDFlowMarket(market),
+      market: transformedMarket,
+      isMultiOutcome,
+      outcomes: allOutcomes,
       source: "dflow",
     });
   } catch (error: any) {

@@ -30,6 +30,12 @@ interface MarketDetail {
   expirationTime: string;
 }
 
+interface MarketResponse {
+  market: MarketDetail;
+  isMultiOutcome: boolean;
+  outcomes: MarketDetail[];
+}
+
 export default function MarketPage() {
   const params = useParams();
   const ticker = params.ticker as string;
@@ -38,6 +44,9 @@ export default function MarketPage() {
   const { login } = useLogin();
 
   const [market, setMarket] = useState<MarketDetail | null>(null);
+  const [isMultiOutcome, setIsMultiOutcome] = useState(false);
+  const [outcomes, setOutcomes] = useState<MarketDetail[]>([]);
+  const [selectedOutcome, setSelectedOutcome] = useState<MarketDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,8 +72,14 @@ export default function MarketPage() {
         if (res.status === 404) throw new Error("Market not found");
         throw new Error("Failed to fetch market");
       }
-      const data = await res.json();
+      const data: MarketResponse = await res.json();
       setMarket(data.market);
+      setIsMultiOutcome(data.isMultiOutcome);
+      setOutcomes(data.outcomes || []);
+      // For multi-outcome, pre-select the current market
+      if (data.isMultiOutcome) {
+        setSelectedOutcome(data.market);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -73,9 +88,12 @@ export default function MarketPage() {
   }
 
   // Use bid prices for more accurate cost calculation
-  const yesPrice = market?.yesPrice ?? 0.5;
-  const noPrice = market?.noPrice ?? 0.5;
-  const selectedPrice = side === "yes" ? yesPrice : noPrice;
+  // For multi-outcome, use the selected outcome's price
+  const activeMarket = isMultiOutcome && selectedOutcome ? selectedOutcome : market;
+  const yesPrice = activeMarket?.yesPrice ?? 0.5;
+  const noPrice = activeMarket?.noPrice ?? 0.5;
+  // For multi-outcome events, we're always buying YES on the selected outcome
+  const selectedPrice = isMultiOutcome ? yesPrice : (side === "yes" ? yesPrice : noPrice);
   const cost = (shares * selectedPrice).toFixed(2);
   const potentialPayout = shares.toFixed(2);
 
@@ -110,13 +128,17 @@ export default function MarketPage() {
 
     try {
       // Create Stripe checkout session
+      // For multi-outcome, use the selected outcome's ticker and always buy YES
+      const checkoutMarket = isMultiOutcome && selectedOutcome ? selectedOutcome : market;
+      const checkoutSide = isMultiOutcome ? "yes" : side;
+
       const res = await fetch("/api/checkout/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          marketTicker: market?.ticker,
-          marketTitle: market?.title,
-          side,
+          marketTicker: checkoutMarket?.ticker,
+          marketTitle: checkoutMarket?.title,
+          side: checkoutSide,
           shares,
           pricePerShare: selectedPrice,
           recipientEmail: recipientContact,
@@ -226,32 +248,69 @@ export default function MarketPage() {
 
             {/* Large Price Display */}
             <div className="bg-card border border-border rounded-2xl p-6 mb-6">
-              <div className="flex justify-between items-end mb-4">
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase mb-1">Yes Price</p>
-                  <p className="text-4xl font-bold" style={{ color: "hsl(var(--yes))" }}>
-                    {Math.round(yesPrice * 100)}¢
+              {isMultiOutcome ? (
+                // Multi-outcome: show all outcomes with prices
+                <>
+                  <p className="text-xs text-muted-foreground uppercase mb-3">
+                    {outcomes.length} Possible Outcomes
                   </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground uppercase mb-1">No Price</p>
-                  <p className="text-4xl font-bold" style={{ color: "hsl(var(--no))" }}>
-                    {Math.round(noPrice * 100)}¢
-                  </p>
-                </div>
-              </div>
+                  <div className="space-y-2">
+                    {outcomes.slice(0, 5).map((outcome) => (
+                      <div key={outcome.ticker} className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-primary transition-all"
+                              style={{ width: `${outcome.yesPrice * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                        <span className="text-sm font-bold text-primary w-12 text-right">
+                          {Math.round(outcome.yesPrice * 100)}¢
+                        </span>
+                        <span className="text-xs text-muted-foreground w-32 truncate">
+                          {outcome.title}
+                        </span>
+                      </div>
+                    ))}
+                    {outcomes.length > 5 && (
+                      <p className="text-xs text-muted-foreground text-center pt-2">
+                        +{outcomes.length - 5} more outcomes
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                // Binary: show Yes/No prices
+                <>
+                  <div className="flex justify-between items-end mb-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase mb-1">Yes Price</p>
+                      <p className="text-4xl font-bold" style={{ color: "hsl(var(--yes))" }}>
+                        {Math.round(yesPrice * 100)}¢
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground uppercase mb-1">No Price</p>
+                      <p className="text-4xl font-bold" style={{ color: "hsl(var(--no))" }}>
+                        {Math.round(noPrice * 100)}¢
+                      </p>
+                    </div>
+                  </div>
 
-              {/* Price bar */}
-              <div className="h-3 bg-secondary rounded-full overflow-hidden flex">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{ width: `${yesPrice * 100}%`, backgroundColor: "hsl(var(--yes))" }}
-                />
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{ width: `${noPrice * 100}%`, backgroundColor: "hsl(var(--no))" }}
-                />
-              </div>
+                  {/* Price bar */}
+                  <div className="h-3 bg-secondary rounded-full overflow-hidden flex">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${yesPrice * 100}%`, backgroundColor: "hsl(var(--yes))" }}
+                    />
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${noPrice * 100}%`, backgroundColor: "hsl(var(--no))" }}
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Market Stats */}
@@ -330,35 +389,71 @@ export default function MarketPage() {
                 <span>🎁</span> Gift This Market
               </h2>
 
-              {/* Side picker */}
+              {/* Outcome/Side picker */}
               <div className="mb-5">
                 <label className="block text-xs text-muted-foreground uppercase tracking-wide mb-2">
-                  Position
+                  {isMultiOutcome ? "Select Outcome" : "Position"}
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => setSide("yes")}
-                    className={`py-4 rounded-xl text-sm font-bold transition ${
-                      side === "yes"
-                        ? "bg-yes/15 border-2 text-yes"
-                        : "bg-secondary border-2 border-transparent text-muted-foreground hover:border-border"
-                    }`}
-                    style={side === "yes" ? { borderColor: "hsl(var(--yes))" } : {}}
-                  >
-                    YES · {Math.round(yesPrice * 100)}¢
-                  </button>
-                  <button
-                    onClick={() => setSide("no")}
-                    className={`py-4 rounded-xl text-sm font-bold transition ${
-                      side === "no"
-                        ? "bg-no/15 border-2 text-no"
-                        : "bg-secondary border-2 border-transparent text-muted-foreground hover:border-border"
-                    }`}
-                    style={side === "no" ? { borderColor: "hsl(var(--no))" } : {}}
-                  >
-                    NO · {Math.round(noPrice * 100)}¢
-                  </button>
-                </div>
+
+                {isMultiOutcome ? (
+                  // Multi-outcome selector
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {outcomes.map((outcome) => (
+                      <button
+                        key={outcome.ticker}
+                        onClick={() => setSelectedOutcome(outcome)}
+                        className={`w-full p-3 rounded-xl text-left transition ${
+                          selectedOutcome?.ticker === outcome.ticker
+                            ? "bg-primary/15 border-2 border-primary"
+                            : "bg-secondary border-2 border-transparent hover:border-border"
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className={`text-sm font-medium ${
+                            selectedOutcome?.ticker === outcome.ticker
+                              ? "text-primary"
+                              : "text-foreground"
+                          }`}>
+                            {outcome.title}
+                          </span>
+                          <span className={`text-sm font-bold ${
+                            selectedOutcome?.ticker === outcome.ticker
+                              ? "text-primary"
+                              : "text-muted-foreground"
+                          }`}>
+                            {Math.round(outcome.yesPrice * 100)}¢
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  // Binary Yes/No selector
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setSide("yes")}
+                      className={`py-4 rounded-xl text-sm font-bold transition ${
+                        side === "yes"
+                          ? "bg-yes/15 border-2 text-yes"
+                          : "bg-secondary border-2 border-transparent text-muted-foreground hover:border-border"
+                      }`}
+                      style={side === "yes" ? { borderColor: "hsl(var(--yes))" } : {}}
+                    >
+                      YES · {Math.round(yesPrice * 100)}¢
+                    </button>
+                    <button
+                      onClick={() => setSide("no")}
+                      className={`py-4 rounded-xl text-sm font-bold transition ${
+                        side === "no"
+                          ? "bg-no/15 border-2 text-no"
+                          : "bg-secondary border-2 border-transparent text-muted-foreground hover:border-border"
+                      }`}
+                      style={side === "no" ? { borderColor: "hsl(var(--no))" } : {}}
+                    >
+                      NO · {Math.round(noPrice * 100)}¢
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Shares picker */}
@@ -459,7 +554,12 @@ export default function MarketPage() {
                   </p>
                 )}
                 <div className="flex justify-between text-xs mt-3 pt-2 border-t border-border">
-                  <span className="text-muted-foreground">If {side.toUpperCase()} wins</span>
+                  <span className="text-muted-foreground">
+                    {isMultiOutcome
+                      ? `If "${selectedOutcome?.title || "selected outcome"}" wins`
+                      : `If ${side.toUpperCase()} wins`
+                    }
+                  </span>
                   <span className="text-accent font-bold">${potentialPayout} payout</span>
                 </div>
               </div>
@@ -473,7 +573,7 @@ export default function MarketPage() {
               {/* Checkout button */}
               <Button
                 onClick={handleCheckout}
-                disabled={step === "processing"}
+                disabled={step === "processing" || (isMultiOutcome && !selectedOutcome)}
                 className="w-full"
                 size="lg"
               >
@@ -484,6 +584,8 @@ export default function MarketPage() {
                   </span>
                 ) : !authenticated ? (
                   "Sign In to Gift"
+                ) : isMultiOutcome && !selectedOutcome ? (
+                  "Select an Outcome"
                 ) : (
                   `🎁 Gift ${shares} Shares · $${cost}`
                 )}
