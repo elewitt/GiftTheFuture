@@ -15,6 +15,7 @@ interface Market {
   volume: number;
   volume24h: number;
   closeTime: string;
+  isMultiOutcome?: boolean;
 }
 
 interface MarketCardProps {
@@ -40,8 +41,8 @@ export function MarketCard({ market, index = 0, showRank = false }: MarketCardPr
   const noPercent = 100 - yesPercent;
   const emoji = categoryEmojis[market.category] || "📊";
 
-  // Detect if this is a multi-outcome market (ticker differs from eventTicker)
-  const isMultiOutcome = market.eventTicker && market.ticker !== market.eventTicker;
+  // Use the isMultiOutcome flag from the API
+  const isMultiOutcome = market.isMultiOutcome ?? false;
 
   const formatVolume = (vol: number) => {
     if (vol >= 1_000_000) return `${(vol / 1_000_000).toFixed(1)}M`;
