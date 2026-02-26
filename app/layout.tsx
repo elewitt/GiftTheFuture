@@ -6,6 +6,10 @@ export const metadata: Metadata = {
   title: "Gift the Future — Prediction Market Gifting",
   description:
     "Gift tokenized prediction market positions. Powered by Kalshi.",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
   openGraph: {
     title: "Gift the Future",
     description: "Someone sent you a stake in the future. Claim it now.",
