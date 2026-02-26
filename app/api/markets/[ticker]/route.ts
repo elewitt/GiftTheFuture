@@ -142,22 +142,39 @@ function extractCategory(ticker: string): string {
   if (!ticker) return "Other";
   const t = ticker.toUpperCase();
 
-  if (t.includes("NFL") || t.includes("NBA") || t.includes("MLB") ||
-      t.includes("NHL") || t.includes("NCAA") || t.includes("MAR") ||
-      t.includes("BOWL") || t.includes("MVP") || t.includes("PGA") ||
-      t.includes("PREMIER") || t.includes("OSCAR")) {
-    return "Sports";
-  }
-  if (t.includes("PRES") || t.includes("FED") || t.includes("NOM") ||
+  // Politics (check first - more specific patterns)
+  if (t.includes("PRES") || t.includes("FEDCHAIR") || t.includes("NOM") ||
       t.includes("TRUMP") || t.includes("DEM") || t.includes("REP") ||
-      t.includes("POWELL") || t.includes("KHAMENEI") || t.includes("GREENLAND")) {
+      t.includes("POWELL") || t.includes("KHAMENEI") || t.includes("GREENLAND") ||
+      t.includes("BIDEN") || t.includes("CONGRESS") || t.includes("SENATE") ||
+      t.includes("SCOTUS") || t.includes("ELECT") || t.includes("VOTE") ||
+      t.includes("GOV") || t.includes("POPE") || t.includes("WAR") ||
+      t.includes("UKRAINE") || t.includes("RUSSIA") || t.includes("CHINA") ||
+      t.includes("IRAN") || t.includes("ISRAEL") || t.includes("NATO") ||
+      t.includes("TARIFF") || t.includes("BORDER") || t.includes("POLICY")) {
     return "Politics";
   }
-  if (t.includes("BTC") || t.includes("ETH") || t.includes("CRYPTO")) {
-    return "Crypto";
+  // Economics / Crypto
+  if (t.includes("CPI") || t.includes("GDP") || t.includes("FOMC") ||
+      t.includes("FEDDECISION") || t.includes("RATE") || t.includes("INFLATION") ||
+      t.includes("JOBS") || t.includes("UNEMPLOYMENT") || t.includes("RECESSION") ||
+      t.includes("DEBT") || t.includes("TREASURY") || t.includes("BOND") ||
+      t.includes("STOCK") || t.includes("SPX") || t.includes("SPY") ||
+      t.includes("QQQ") || t.includes("DOW") || t.includes("NASDAQ") ||
+      t.includes("EARNINGS") || t.includes("BTC") || t.includes("ETH") ||
+      t.includes("CRYPTO") || t.includes("OIL") || t.includes("GOLD") ||
+      t.includes("SILVER")) {
+    return "Economics";
   }
-  if (t.includes("EARNINGS")) {
-    return "Business";
+  // Sports (check last - avoid matching dates like "26MAR01")
+  if (t.includes("NFL") || t.includes("NBA") || t.includes("MLB") ||
+      t.includes("NHL") || t.includes("NCAA") || t.includes("MARMAD") ||
+      t.includes("BOWL") || t.includes("MVP") || t.includes("PGA") ||
+      t.includes("PREMIER") || t.includes("OSCAR") || t.includes("TENNIS") ||
+      t.includes("GOLF") || t.includes("UFC") || t.includes("BOXING") ||
+      t.includes("SOCCER") || t.includes("WORLDCUP") || t.includes("OLYMPICS") ||
+      t.includes("CHAMPION") || t.includes("PLAYOFF") || t.includes("FINALS")) {
+    return "Sports";
   }
 
   return "Other";
