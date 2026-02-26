@@ -36,6 +36,48 @@ interface MarketResponse {
   outcomes: MarketDetail[];
 }
 
+// Common player/person abbreviation lookups
+const ABBREVIATION_LOOKUP: Record<string, string> = {
+  // NBA Players
+  "SGIL": "Shai Gilgeous-Alexander",
+  "NJOK": "Nikola Jokic",
+  "CCUN": "Cade Cunningham",
+  "VWEM": "Victor Wembanyama",
+  "JBRO": "Jaylen Brown",
+  "LDON": "Luka Doncic",
+  "LJAR": "LeBron James",
+  "JTAT": "Jayson Tatum",
+  "GANT": "Giannis Antetokounmpo",
+  "SCUR": "Stephen Curry",
+  "KDUR": "Kevin Durant",
+  "JEMB": "Joel Embiid",
+  "JMOR": "Ja Morant",
+  "DBOOK": "Devin Booker",
+  "TANT": "Trae Young",
+  "DMIT": "Donovan Mitchell",
+  "AEDW": "Anthony Edwards",
+  "ADED": "Anthony Davis",
+  "JHAR": "James Harden",
+  "KLEO": "Kawhi Leonard",
+  "PBAT": "Paolo Banchero",
+  // NFL Players
+  "JALL": "Josh Allen",
+  "PMAH": "Patrick Mahomes",
+  "LJAC": "Lamar Jackson",
+  "JHER": "Justin Herbert",
+  "JBUR": "Joe Burrow",
+  "THUR": "Tua Tagovailoa",
+  // Politicians
+  "JS": "Judy Shelton",
+  "KW": "Kevin Warsh",
+  "KH": "Kevin Hassett",
+  "RREI": "Rick Rieder",
+  "CWAL": "Christopher Waller",
+  "MBOW": "Michelle Bowman",
+  "SBES": "Scott Bessent",
+  "SMIR": "Stephen Miran",
+};
+
 /**
  * Extract a meaningful label from a ticker for multi-outcome events.
  * E.g., "KXBTCMAX150-25-26MAY31-149999.99" → "By May 31, 2026"
@@ -91,9 +133,14 @@ function getOutcomeLabel(outcome: MarketDetail, allOutcomes: MarketDetail[]): st
   const parts = ticker.split('-');
   const suffix = parts[parts.length - 1] || "";
 
-  // If suffix is just initials, show as "Option: X"
-  if (suffix && /^[A-Z]+$/.test(suffix) && suffix.length <= 5) {
-    return `Option: ${suffix}`;
+  // Check if we have a known abbreviation lookup
+  if (suffix && ABBREVIATION_LOOKUP[suffix]) {
+    return ABBREVIATION_LOOKUP[suffix];
+  }
+
+  // If suffix is just initials, show it as-is
+  if (suffix && /^[A-Z]+$/.test(suffix)) {
+    return suffix;
   }
 
   return suffix || outcome.title.substring(0, 25);

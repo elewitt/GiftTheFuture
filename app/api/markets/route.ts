@@ -25,6 +25,48 @@ interface DFlowMarketFull {
   expirationTime?: number;
 }
 
+// Common player/person abbreviation lookups
+const ABBREVIATION_LOOKUP: Record<string, string> = {
+  // NBA Players
+  "SGIL": "Shai Gilgeous-Alexander",
+  "NJOK": "Nikola Jokic",
+  "CCUN": "Cade Cunningham",
+  "VWEM": "Victor Wembanyama",
+  "JBRO": "Jaylen Brown",
+  "LDON": "Luka Doncic",
+  "LJAR": "LeBron James",
+  "JTAT": "Jayson Tatum",
+  "GANT": "Giannis Antetokounmpo",
+  "SCUR": "Stephen Curry",
+  "KDUR": "Kevin Durant",
+  "JEMB": "Joel Embiid",
+  "JMOR": "Ja Morant",
+  "DBOOK": "Devin Booker",
+  "TANT": "Trae Young",
+  "DMIT": "Donovan Mitchell",
+  "AEDW": "Anthony Edwards",
+  "ADED": "Anthony Davis",
+  "JHAR": "James Harden",
+  "KLEO": "Kawhi Leonard",
+  "PBAT": "Paolo Banchero",
+  // NFL Players
+  "JALL": "Josh Allen",
+  "PMAH": "Patrick Mahomes",
+  "LJAC": "Lamar Jackson",
+  "JHER": "Justin Herbert",
+  "JBUR": "Joe Burrow",
+  "THUR": "Tua Tagovailoa",
+  // Politicians
+  "JS": "Judy Shelton",
+  "KW": "Kevin Warsh",
+  "KH": "Kevin Hassett",
+  "RREI": "Rick Rieder",
+  "CWAL": "Christopher Waller",
+  "MBOW": "Michelle Bowman",
+  "SBES": "Scott Bessent",
+  "SMIR": "Stephen Miran",
+};
+
 /**
  * Extract a meaningful label from ticker for multi-outcome events
  */
@@ -68,14 +110,18 @@ function getOutcomeLabel(ticker: string, title: string, allMarkets: DFlowMarketF
     return `By ${monthName} ${parseInt(day)}, 20${year}`;
   }
 
-  // Fallback: last part of ticker (but try to make it more readable)
+  // Fallback: last part of ticker
   const parts = ticker.split("-");
   const suffix = parts[parts.length - 1] || "";
 
-  // If suffix is just initials (all caps, no numbers), it's not very useful
-  // Return a more descriptive fallback
-  if (suffix && /^[A-Z]+$/.test(suffix) && suffix.length <= 5) {
-    return `Option: ${suffix}`;
+  // Check if we have a known abbreviation lookup
+  if (suffix && ABBREVIATION_LOOKUP[suffix]) {
+    return ABBREVIATION_LOOKUP[suffix];
+  }
+
+  // If suffix is just initials, show it as-is (better than "Option:")
+  if (suffix && /^[A-Z]+$/.test(suffix)) {
+    return suffix;
   }
 
   return suffix || title.substring(0, 20);
