@@ -33,7 +33,25 @@ function getOutcomeLabel(ticker: string, title: string, allMarkets: DFlowMarketF
   const allSameTitle = allMarkets.every(m => m.title === allMarkets[0]?.title);
 
   if (!allSameTitle) {
-    // Titles are different - use a shortened version
+    // Titles are different - extract the unique part
+    // Try to extract name from patterns like "Will X win MVP?" or "Will X be nominated?"
+    const namePatterns = [
+      /^Will\s+(.+?)\s+win/i,           // "Will Shai Gilgeous-Alexander win MVP?"
+      /^Will\s+(.+?)\s+be\s+/i,         // "Will X be nominated?"
+      /nominate\s+(.+?)\s+as/i,         // "nominate Kevin Warsh as Fed Chair"
+      /^(.+?)\s+to\s+win/i,             // "Lakers to win championship"
+      /^(.+?)\s+wins?\s/i,              // "Lakers wins..."
+    ];
+
+    for (const pattern of namePatterns) {
+      const match = title.match(pattern);
+      if (match && match[1]) {
+        const name = match[1].trim();
+        return name.length > 25 ? name.substring(0, 22) + "..." : name;
+      }
+    }
+
+    // If no pattern matches, use shortened title
     return title.length > 30 ? title.substring(0, 27) + "..." : title;
   }
 
@@ -50,15 +68,17 @@ function getOutcomeLabel(ticker: string, title: string, allMarkets: DFlowMarketF
     return `By ${monthName} ${parseInt(day)}, 20${year}`;
   }
 
-  // Try to extract name from title (e.g., "nominate X as Fed Chair")
-  const nameMatch = title.match(/nominate\s+(\w+\s+\w+)/i);
-  if (nameMatch) {
-    return nameMatch[1];
+  // Fallback: last part of ticker (but try to make it more readable)
+  const parts = ticker.split("-");
+  const suffix = parts[parts.length - 1] || "";
+
+  // If suffix is just initials (all caps, no numbers), it's not very useful
+  // Return a more descriptive fallback
+  if (suffix && /^[A-Z]+$/.test(suffix) && suffix.length <= 5) {
+    return `Option: ${suffix}`;
   }
 
-  // Fallback: last part of ticker
-  const parts = ticker.split("-");
-  return parts[parts.length - 1] || title.substring(0, 20);
+  return suffix || title.substring(0, 20);
 }
 
 /**

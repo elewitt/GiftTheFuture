@@ -39,15 +39,35 @@ interface MarketResponse {
 /**
  * Extract a meaningful label from a ticker for multi-outcome events.
  * E.g., "KXBTCMAX150-25-26MAY31-149999.99" → "By May 31, 2026"
- * E.g., "KXFEDCHAIRNOM-29-JS" → "Judy Shelton" (from title)
+ * E.g., "Will Shai Gilgeous-Alexander win MVP?" → "Shai Gilgeous-Alexander"
  */
 function getOutcomeLabel(outcome: MarketDetail, allOutcomes: MarketDetail[]): string {
   // Check if all outcomes have the same title
   const allSameTitle = allOutcomes.every(o => o.title === allOutcomes[0]?.title);
 
   if (!allSameTitle) {
-    // Titles are different - use the title
-    return outcome.title;
+    // Titles are different - extract the unique part (usually a name)
+    const title = outcome.title;
+
+    // Try to extract name from common patterns
+    const namePatterns = [
+      /^Will\s+(.+?)\s+win/i,           // "Will Shai Gilgeous-Alexander win MVP?"
+      /^Will\s+(.+?)\s+be\s+/i,         // "Will X be nominated?"
+      /nominate\s+(.+?)\s+as/i,         // "nominate Kevin Warsh as Fed Chair"
+      /^(.+?)\s+to\s+win/i,             // "Lakers to win championship"
+      /^(.+?)\s+wins?\s/i,              // "Lakers wins..."
+    ];
+
+    for (const pattern of namePatterns) {
+      const match = title.match(pattern);
+      if (match && match[1]) {
+        const name = match[1].trim();
+        return name.length > 30 ? name.substring(0, 27) + "..." : name;
+      }
+    }
+
+    // If no pattern matches, use shortened title
+    return title.length > 35 ? title.substring(0, 32) + "..." : title;
   }
 
   // Titles are the same - try to extract date from ticker
@@ -67,19 +87,16 @@ function getOutcomeLabel(outcome: MarketDetail, allOutcomes: MarketDetail[]): st
     return `By ${monthName} ${parseInt(day)}, ${fullYear}`;
   }
 
-  // Pattern: Look for suffix like -JS, -KW (initials)
-  const suffixMatch = ticker.match(/-([A-Z]{2,})$/);
-  if (suffixMatch) {
-    // Try to extract the name from the title
-    const nameMatch = outcome.title.match(/nominate\s+(\w+\s+\w+)/i);
-    if (nameMatch) {
-      return nameMatch[1];
-    }
-  }
-
   // Fallback: Use the last part of the ticker
   const parts = ticker.split('-');
-  return parts[parts.length - 1] || outcome.title;
+  const suffix = parts[parts.length - 1] || "";
+
+  // If suffix is just initials, show as "Option: X"
+  if (suffix && /^[A-Z]+$/.test(suffix) && suffix.length <= 5) {
+    return `Option: ${suffix}`;
+  }
+
+  return suffix || outcome.title.substring(0, 25);
 }
 
 export default function MarketPage() {
