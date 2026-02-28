@@ -212,7 +212,7 @@ export default function MarketPage() {
   const potentialPayout = shares.toFixed(2);
 
   // Minimum order amount for DFlow
-  const MIN_ORDER_AMOUNT = 2.50;
+  const MIN_ORDER_AMOUNT = 1.00;
   const isBelowMinimum = giftAmountNum < MIN_ORDER_AMOUNT;
 
   async function handleCheckout() {
