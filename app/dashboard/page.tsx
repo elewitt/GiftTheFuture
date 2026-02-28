@@ -10,7 +10,6 @@ import { motion } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { KYCVerification, useKYCStatus } from "@/components/KYCVerification";
 
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
@@ -103,7 +102,6 @@ export default function DashboardPage() {
   const { ready, authenticated, user, logout } = usePrivy();
   const { login } = useLogin();
   const { wallets } = useSolanaWallets();
-  const { verified: kycVerified, loading: kycLoading } = useKYCStatus();
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -726,11 +724,6 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-
-      {/* KYC Verification Prompt */}
-      {authenticated && !kycLoading && kycVerified === false && (
-        <KYCVerification showAsModal={true} />
-      )}
 
       <div className="pt-24 max-w-5xl mx-auto px-5 pb-20">
         {/* Summary Cards */}

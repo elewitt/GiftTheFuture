@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
+import { KYCVerification, useKYCStatus } from "@/components/KYCVerification";
 
 interface MarketDetail {
   ticker: string;
@@ -152,6 +153,10 @@ export default function MarketPage() {
 
   const { ready, authenticated, user } = usePrivy();
   const { login } = useLogin();
+  const { verified: kycVerified, loading: kycLoading, refetch: refetchKYC } = useKYCStatus();
+
+  // KYC modal state
+  const [showKYCModal, setShowKYCModal] = useState(false);
 
   const [market, setMarket] = useState<MarketDetail | null>(null);
   const [isMultiOutcome, setIsMultiOutcome] = useState(false);
@@ -218,6 +223,12 @@ export default function MarketPage() {
   async function handleCheckout() {
     if (!authenticated) {
       login();
+      return;
+    }
+
+    // Check KYC status before allowing purchase
+    if (!kycVerified) {
+      setShowKYCModal(true);
       return;
     }
 
@@ -326,6 +337,18 @@ export default function MarketPage() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+
+      {/* KYC Verification Modal - shown when user tries to purchase without KYC */}
+      {showKYCModal && (
+        <KYCVerification
+          showAsModal={true}
+          onVerified={() => {
+            setShowKYCModal(false);
+            refetchKYC();
+          }}
+          onClose={() => setShowKYCModal(false)}
+        />
+      )}
 
       {/* Header */}
       <div className="pt-24 max-w-5xl mx-auto px-5">

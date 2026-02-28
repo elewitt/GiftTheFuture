@@ -8,10 +8,11 @@ import bs58 from "bs58";
 
 interface KYCVerificationProps {
   onVerified?: () => void;
+  onClose?: () => void;
   showAsModal?: boolean;
 }
 
-export function KYCVerification({ onVerified, showAsModal = true }: KYCVerificationProps) {
+export function KYCVerification({ onVerified, onClose, showAsModal = true }: KYCVerificationProps) {
   const { user, authenticated, signMessage } = usePrivy();
   const [kycStatus, setKycStatus] = useState<"loading" | "verified" | "unverified" | "error">("loading");
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
@@ -109,14 +110,17 @@ export function KYCVerification({ onVerified, showAsModal = true }: KYCVerificat
     }
   };
 
-  // Don't render anything if verified or not authenticated
-  if (!authenticated || kycStatus === "verified") {
-    return null;
-  }
+  // When shown on-demand (with onClose), always render the modal
+  // Otherwise, don't render if verified or not authenticated
+  if (!onClose) {
+    if (!authenticated || kycStatus === "verified") {
+      return null;
+    }
 
-  // Loading state
-  if (kycStatus === "loading") {
-    return null; // Don't show anything while checking
+    // Loading state
+    if (kycStatus === "loading") {
+      return null; // Don't show anything while checking
+    }
   }
 
   const content = (
@@ -151,6 +155,15 @@ export function KYCVerification({ onVerified, showAsModal = true }: KYCVerificat
           "Verify Identity"
         )}
       </Button>
+
+      {onClose && (
+        <button
+          onClick={onClose}
+          className="block w-full text-sm text-muted-foreground hover:text-foreground mt-4 transition"
+        >
+          Maybe Later
+        </button>
+      )}
 
       <p className="text-[10px] text-muted-foreground mt-4">
         Powered by DFlow Proof · Secure identity verification
