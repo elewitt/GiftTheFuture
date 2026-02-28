@@ -5,3 +5,13 @@ node_modules/
 *.pem
 server-wallet.json
 .vercel
+.env.prod
+.env.production
+.env.vercel
+.env.vercel.prod
+compare-tickers.mjs
+test-dflow-lookup.mjs
+test-dflow.mjs
+test-full-flow.mjs
+generate-kyc-url.mjs
+tsconfig.tsbuildinfo
