@@ -35,6 +35,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Gift not found" }, { status: 404 });
     }
 
+    if (gift.status === "failed") {
+      return NextResponse.json(
+        {
+          error: "This gift could not be purchased due to a processing error. The sender has been notified and will receive a refund.",
+          status: gift.status,
+        },
+        { status: 400 }
+      );
+    }
+
     if (gift.status !== "pending_claim") {
       return NextResponse.json(
         {

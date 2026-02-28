@@ -130,13 +130,31 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
       console.log("[Webhook] 🚀 PRODUCTION MODE - Executing real DFlow purchase");
 
       try {
+        // Check if server wallet is KYC verified with Proof
+        const serverKeypair = getServerKeypair();
+        const serverWallet = serverKeypair.publicKey.toBase58();
+        console.log("[Webhook] Server wallet:", serverWallet);
+
+        try {
+          const kycRes = await fetch(`https://proof.dflow.net/verify/${serverWallet}`);
+          const kycData = await kycRes.json();
+          console.log("[Webhook] KYC status:", kycData);
+
+          if (!kycData.verified) {
+            throw new Error(`Server wallet ${serverWallet} is not KYC verified with Proof. Complete verification at https://proof.dflow.net`);
+          }
+        } catch (kycErr: any) {
+          if (kycErr.message?.includes("not KYC verified")) {
+            throw kycErr; // Re-throw our custom error
+          }
+          console.warn("[Webhook] Could not check KYC status:", kycErr.message);
+          // Continue anyway - let DFlow reject if needed
+        }
+
         console.log("[Webhook] Getting outcome mints for:", marketTicker);
         const { yesMint, noMint } = await getOutcomeMints(marketTicker);
         outputMint = side === "yes" ? yesMint : noMint;
         console.log("[Webhook] Output mint:", outputMint);
-
-        const serverKeypair = getServerKeypair();
-        console.log("[Webhook] Server wallet:", serverKeypair.publicKey.toBase58());
 
         const amountUSDC = parseFloat(shares) * parseFloat(pricePerShare);
         const amountLamports = Math.floor(amountUSDC * 1_000_000);
@@ -170,9 +188,35 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
       } catch (txErr: any) {
         console.error("[Webhook] ❌ DFlow transaction failed:", txErr.message || txErr);
         console.error("[Webhook] Full error:", JSON.stringify(txErr, null, 2));
-        // Continue to create gift record even if tx failed - it will be in failed state
-        // tokensReceived stays at the initialized value (sharesNum * 10^6)
-        purchaseTxSig = "FAILED-" + Date.now();
+
+        // Create gift record marked as FAILED - do not mark as claimable
+        const failedGift = await createGift({
+          marketTicker,
+          marketTitle: marketTitle || marketTicker,
+          side: side as "yes" | "no",
+          outcomeMint: outputMint,
+          tokenAmount: 0, // No tokens were purchased
+          costUSDC: parseFloat(shares) * parseFloat(pricePerShare),
+          senderPrivyId: senderPrivyId || senderEmail || "stripe-" + session.id,
+          recipientName: recipientName || "",
+          recipientContact: recipientEmail,
+          giftMessage: giftMessage || "",
+        });
+
+        await updateGift(failedGift.id, {
+          status: "failed",
+          purchaseTxSig: "FAILED-" + Date.now(),
+          tokenAmount: 0,
+        });
+
+        console.error("[Webhook] Gift marked as failed:", failedGift.id);
+        console.error("[Webhook] ⚠️ IMPORTANT: The DFlow purchase failed. This is likely because the server wallet is not KYC verified with Proof.");
+        console.error("[Webhook] To fix: Complete KYC at https://proof.dflow.net for wallet:", process.env.SERVER_WALLET_PUBLIC_KEY || "(check Vercel env vars)");
+
+        // TODO: Send failure notification email to sender
+        // TODO: Initiate Stripe refund
+
+        return; // Exit early - don't proceed with success flow
       }
     }
 

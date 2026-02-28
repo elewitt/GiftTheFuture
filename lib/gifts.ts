@@ -12,7 +12,8 @@ export type GiftStatus =
   | "claimed"
   | "cashed_out"
   | "settled"
-  | "expired";
+  | "expired"
+  | "failed";
 
 export interface Gift {
   id: string;
