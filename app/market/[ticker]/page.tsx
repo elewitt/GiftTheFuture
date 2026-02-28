@@ -162,7 +162,7 @@ export default function MarketPage() {
 
   // Gift builder state
   const [side, setSide] = useState<"yes" | "no">("yes");
-  const [shares, setShares] = useState(10);
+  const [giftAmount, setGiftAmount] = useState("10"); // Dollar amount as string for input
   const [recipientName, setRecipientName] = useState("");
   const [recipientContact, setRecipientContact] = useState("");
   const [giftMessage, setGiftMessage] = useState("");
@@ -204,13 +204,16 @@ export default function MarketPage() {
   const noPrice = activeMarket?.noPrice ?? 0.5;
   // For multi-outcome events, we're always buying YES on the selected outcome
   const selectedPrice = isMultiOutcome ? yesPrice : (side === "yes" ? yesPrice : noPrice);
-  const cost = (shares * selectedPrice).toFixed(2);
+
+  // Calculate shares from gift amount
+  const giftAmountNum = parseFloat(giftAmount) || 0;
+  const shares = selectedPrice > 0 ? Math.floor(giftAmountNum / selectedPrice) : 0;
+  const actualCost = (shares * selectedPrice).toFixed(2);
   const potentialPayout = shares.toFixed(2);
 
   // Minimum order amount for DFlow
-  const MIN_ORDER_AMOUNT = 1.0;
-  const orderAmount = shares * selectedPrice;
-  const isBelowMinimum = orderAmount < MIN_ORDER_AMOUNT;
+  const MIN_ORDER_AMOUNT = 2.50;
+  const isBelowMinimum = giftAmountNum < MIN_ORDER_AMOUNT;
 
   async function handleCheckout() {
     if (!authenticated) {
@@ -229,7 +232,7 @@ export default function MarketPage() {
     }
 
     if (isBelowMinimum) {
-      setCheckoutError(`Minimum order is $${MIN_ORDER_AMOUNT.toFixed(2)}. Please add more shares.`);
+      setCheckoutError(`Minimum gift amount is $${MIN_ORDER_AMOUNT.toFixed(2)}.`);
       return;
     }
 
@@ -472,7 +475,7 @@ export default function MarketPage() {
                   <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">1</span>
                   <div>
                     <p className="text-sm text-foreground font-medium">Pick your position</p>
-                    <p className="text-xs text-muted-foreground">Choose YES or NO and how many shares</p>
+                    <p className="text-xs text-muted-foreground">Choose YES or NO and gift amount</p>
                   </div>
                 </div>
                 <div className="flex gap-3">
@@ -579,40 +582,43 @@ export default function MarketPage() {
                 )}
               </div>
 
-              {/* Shares picker */}
+              {/* Gift Amount Input */}
               <div className="mb-5">
                 <label className="block text-xs text-muted-foreground uppercase tracking-wide mb-2">
-                  Shares
+                  Gift Amount
                 </label>
-                <div className="flex items-center justify-center gap-4 mb-3">
-                  <button
-                    onClick={() => setShares(Math.max(5, shares - 5))}
-                    className="w-12 h-12 rounded-xl bg-secondary text-foreground text-xl font-bold hover:bg-secondary/80 transition"
-                  >
-                    −
-                  </button>
-                  <span className="text-4xl font-bold text-foreground w-20 text-center font-mono">
-                    {shares}
-                  </span>
-                  <button
-                    onClick={() => setShares(shares + 5)}
-                    className="w-12 h-12 rounded-xl bg-secondary text-foreground text-xl font-bold hover:bg-secondary/80 transition"
-                  >
-                    +
-                  </button>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-muted-foreground">$</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={giftAmount}
+                    onChange={(e) => {
+                      // Only allow numbers and decimal point
+                      const val = e.target.value.replace(/[^0-9.]/g, '');
+                      // Prevent multiple decimal points
+                      const parts = val.split('.');
+                      if (parts.length > 2) return;
+                      // Limit to 2 decimal places
+                      if (parts[1] && parts[1].length > 2) return;
+                      setGiftAmount(val);
+                    }}
+                    placeholder="10.00"
+                    className="w-full pl-10 pr-4 py-4 text-2xl font-bold text-center bg-secondary border-2 border-transparent rounded-xl focus:outline-none focus:border-primary transition"
+                  />
                 </div>
-                <div className="flex justify-center gap-2">
+                <div className="flex justify-center gap-2 mt-3">
                   {[5, 10, 25, 50, 100].map((n) => (
                     <button
                       key={n}
-                      onClick={() => setShares(n)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-mono transition ${
-                        shares === n
+                      onClick={() => setGiftAmount(n.toString())}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                        parseFloat(giftAmount) === n
                           ? "bg-primary/20 text-primary border border-primary/30"
                           : "bg-secondary text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      {n}
+                      ${n}
                     </button>
                   ))}
                 </div>
@@ -655,36 +661,42 @@ export default function MarketPage() {
                 />
               </div>
 
-              {/* Cost summary */}
+              {/* Payout Summary */}
               <div className="bg-secondary/50 rounded-xl p-4 mb-4">
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">
-                    {shares} shares × {Math.round(selectedPrice * 100)}¢
-                  </span>
-                  <span className="text-foreground">${cost}</span>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground uppercase mb-1">You Pay</p>
+                    <p className={`text-2xl font-bold ${isBelowMinimum ? "text-amber-500" : "text-foreground"}`}>
+                      ${actualCost}
+                    </p>
+                  </div>
+                  <div className="text-2xl text-muted-foreground">→</div>
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground uppercase mb-1">Potential Win</p>
+                    <p className="text-2xl font-bold text-accent">
+                      ${potentialPayout}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">Platform fee</span>
-                  <span className="text-primary">Free (beta)</span>
+
+                <div className="text-xs text-muted-foreground text-center border-t border-border pt-3">
+                  <span>{shares} shares @ {Math.round(selectedPrice * 100)}¢ each</span>
+                  {isMultiOutcome && selectedOutcome ? (
+                    <span className="block mt-1">
+                      Wins if "{getOutcomeLabel(selectedOutcome, outcomes)}" happens
+                    </span>
+                  ) : !isMultiOutcome ? (
+                    <span className="block mt-1">
+                      Wins if {side.toUpperCase()} is correct
+                    </span>
+                  ) : null}
                 </div>
-                <div className="flex justify-between text-sm pt-2 border-t border-border">
-                  <span className="text-foreground font-semibold">Total</span>
-                  <span className={`font-bold text-xl ${isBelowMinimum ? "text-amber-500" : "text-foreground"}`}>${cost}</span>
-                </div>
+
                 {isBelowMinimum && (
-                  <p className="text-xs text-amber-500 mt-2">
-                    Minimum order is ${MIN_ORDER_AMOUNT.toFixed(2)}
+                  <p className="text-xs text-amber-500 mt-3 text-center">
+                    Minimum gift is ${MIN_ORDER_AMOUNT.toFixed(2)}
                   </p>
                 )}
-                <div className="flex justify-between text-xs mt-3 pt-2 border-t border-border">
-                  <span className="text-muted-foreground">
-                    {isMultiOutcome
-                      ? `If "${selectedOutcome?.title || "selected outcome"}" wins`
-                      : `If ${side.toUpperCase()} wins`
-                    }
-                  </span>
-                  <span className="text-accent font-bold">${potentialPayout} payout</span>
-                </div>
               </div>
 
               {checkoutError && (
@@ -696,7 +708,7 @@ export default function MarketPage() {
               {/* Checkout button */}
               <Button
                 onClick={handleCheckout}
-                disabled={step === "processing" || (isMultiOutcome && !selectedOutcome)}
+                disabled={step === "processing" || (isMultiOutcome && !selectedOutcome) || isBelowMinimum || shares === 0}
                 className="w-full"
                 size="lg"
               >
@@ -709,8 +721,12 @@ export default function MarketPage() {
                   "Sign In to Gift"
                 ) : isMultiOutcome && !selectedOutcome ? (
                   "Select an Outcome"
+                ) : isBelowMinimum ? (
+                  `Minimum $${MIN_ORDER_AMOUNT.toFixed(2)}`
+                ) : shares === 0 ? (
+                  "Enter Gift Amount"
                 ) : (
-                  `🎁 Gift ${shares} Shares · $${cost}`
+                  `🎁 Send $${actualCost} Gift`
                 )}
               </Button>
 
