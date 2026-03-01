@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { MarketSearch } from "@/components/MarketSearch";
+import { MarchMadnessPromo } from "@/components/MarchMadnessPromo";
 
 // Animated floating orb component
 function FloatingOrb({
@@ -112,6 +113,11 @@ export function HeroSection() {
             showTrending={true}
           />
         </motion.div>
+
+        {/* March Madness Promo */}
+        <div className="relative z-40 mx-auto mt-8 max-w-2xl">
+          <MarchMadnessPromo />
+        </div>
       </div>
     </section>
   );
