@@ -79,6 +79,65 @@ const ABBREVIATION_LOOKUP: Record<string, string> = {
 };
 
 /**
+ * Detect if this is a head-to-head matchup (e.g., "Toronto at Washington Winner?")
+ */
+function isHeadToHeadMatchup(title: string): boolean {
+  const lowerTitle = title.toLowerCase();
+  return (lowerTitle.includes(' at ') || lowerTitle.includes(' vs ') || lowerTitle.includes(' v '))
+    && (lowerTitle.includes('winner') || lowerTitle.includes('win'));
+}
+
+/**
+ * Extract team names from a head-to-head matchup title
+ * E.g., "Toronto at Washington Winner?" → ["Toronto", "Washington"]
+ */
+function extractTeamNames(title: string): [string, string] | null {
+  // Try "Team1 at Team2 Winner?" pattern
+  const atMatch = title.match(/^(.+?)\s+at\s+(.+?)\s+(?:Winner|Win)/i);
+  if (atMatch) {
+    return [atMatch[1].trim(), atMatch[2].trim()];
+  }
+
+  // Try "Team1 vs Team2 Winner?" pattern
+  const vsMatch = title.match(/^(.+?)\s+(?:vs\.?|v)\s+(.+?)\s+(?:Winner|Win)/i);
+  if (vsMatch) {
+    return [vsMatch[1].trim(), vsMatch[2].trim()];
+  }
+
+  return null;
+}
+
+/**
+ * For head-to-head matchups, determine which team this outcome represents
+ */
+function getTeamFromOutcome(outcome: MarketDetail, teamNames: [string, string]): string {
+  const ticker = outcome.ticker.toUpperCase();
+  const [team1, team2] = teamNames;
+
+  // Check if ticker contains team abbreviation or name
+  // Common pattern: ticker ends with team abbreviation like -TOR, -WAS, etc.
+  const parts = outcome.ticker.split('-');
+  const suffix = parts[parts.length - 1]?.toUpperCase() || "";
+
+  // Try to match suffix to team names
+  const team1Upper = team1.toUpperCase();
+  const team2Upper = team2.toUpperCase();
+
+  // Check if suffix is an abbreviation of team1
+  if (team1Upper.startsWith(suffix) || suffix.startsWith(team1Upper.slice(0, 3))) {
+    return team1;
+  }
+
+  // Check if suffix is an abbreviation of team2
+  if (team2Upper.startsWith(suffix) || suffix.startsWith(team2Upper.slice(0, 3))) {
+    return team2;
+  }
+
+  // Fallback: use ticker position or suffix directly
+  return suffix || team1;
+}
+
+/**
  * Extract a meaningful label from a ticker for multi-outcome events.
  * E.g., "KXBTCMAX150-25-26MAY31-149999.99" → "By May 31, 2026"
  * E.g., "Will Shai Gilgeous-Alexander win MVP?" → "Shai Gilgeous-Alexander"
@@ -110,6 +169,15 @@ function getOutcomeLabel(outcome: MarketDetail, allOutcomes: MarketDetail[]): st
 
     // If no pattern matches, use shortened title
     return title.length > 35 ? title.substring(0, 32) + "..." : title;
+  }
+
+  // Titles are the same - check for head-to-head matchup first
+  const title = allOutcomes[0]?.title || "";
+  if (isHeadToHeadMatchup(title)) {
+    const teamNames = extractTeamNames(title);
+    if (teamNames) {
+      return getTeamFromOutcome(outcome, teamNames);
+    }
   }
 
   // Titles are the same - try to extract date from ticker
@@ -371,7 +439,48 @@ export default function MarketPage() {
 
             {/* Large Price Display */}
             <div className="bg-card border border-border rounded-2xl p-6 mb-6">
-              {isMultiOutcome ? (
+              {isMultiOutcome && outcomes.length === 2 && isHeadToHeadMatchup(market.title) ? (
+                // Head-to-head matchup: show both teams on one line
+                (() => {
+                  const teamNames = extractTeamNames(market.title);
+                  const sortedOutcomes = [...outcomes].sort((a, b) => b.yesPrice - a.yesPrice);
+                  const outcome1 = sortedOutcomes[0];
+                  const outcome2 = sortedOutcomes[1];
+                  const label1 = teamNames ? getTeamFromOutcome(outcome1, teamNames) : getOutcomeLabel(outcome1, outcomes);
+                  const label2 = teamNames ? getTeamFromOutcome(outcome2, teamNames) : getOutcomeLabel(outcome2, outcomes);
+
+                  return (
+                    <>
+                      <div className="flex justify-between items-end mb-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase mb-1">{label1}</p>
+                          <p className="text-4xl font-bold text-primary">
+                            {Math.round(outcome1.yesPrice * 100)}%
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground uppercase mb-1">{label2}</p>
+                          <p className="text-4xl font-bold text-muted-foreground">
+                            {Math.round(outcome2.yesPrice * 100)}%
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Price bar */}
+                      <div className="h-3 bg-secondary rounded-full overflow-hidden flex">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{ width: `${outcome1.yesPrice * 100}%` }}
+                        />
+                        <div
+                          className="h-full rounded-full bg-muted-foreground/30 transition-all"
+                          style={{ width: `${outcome2.yesPrice * 100}%` }}
+                        />
+                      </div>
+                    </>
+                  );
+                })()
+              ) : isMultiOutcome ? (
                 // Multi-outcome: show all outcomes with prices
                 <>
                   <p className="text-xs text-muted-foreground uppercase mb-4">
