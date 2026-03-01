@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPositions, Position } from "@/lib/solana";
 import { getOutcomeMints, getMarket } from "@/lib/dflow";
+import { PublicKey } from "@solana/web3.js";
 
 const MINIMUM_POSITION_VALUE = 1; // $1 minimum (for testing)
 
@@ -15,9 +16,21 @@ interface VerificationResult {
 }
 
 /**
+ * Validate that a string is a valid Solana address
+ */
+function isValidSolanaAddress(address: string): boolean {
+  try {
+    new PublicKey(address);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * GET /api/chat/[eventTicker]/verify?wallet=xxx
  *
- * Verify that a wallet holds at least $50 worth of any outcome
+ * Verify that a wallet holds at least $1 worth of any outcome
  * for the given event. Returns position info if verified.
  */
 export async function GET(
@@ -25,9 +38,12 @@ export async function GET(
   { params }: { params: Promise<{ eventTicker: string }> }
 ): Promise<NextResponse<VerificationResult>> {
   try {
-    const { eventTicker } = await params;
+    const { eventTicker: rawEventTicker } = await params;
     const { searchParams } = new URL(req.url);
     const wallet = searchParams.get("wallet");
+
+    // Decode URL-encoded event ticker
+    const eventTicker = decodeURIComponent(rawEventTicker);
 
     if (!wallet) {
       return NextResponse.json({ verified: false, error: "Missing wallet address" });
@@ -37,8 +53,27 @@ export async function GET(
       return NextResponse.json({ verified: false, error: "Missing event ticker" });
     }
 
+    // Validate wallet address
+    if (!isValidSolanaAddress(wallet)) {
+      return NextResponse.json({
+        verified: false,
+        error: "Invalid wallet address format"
+      });
+    }
+
+    console.log("[Chat Verify] Checking wallet:", wallet, "for event:", eventTicker);
+
     // Get all positions for this wallet
-    const positions = await getPositions(wallet);
+    let positions: Position[];
+    try {
+      positions = await getPositions(wallet);
+    } catch (posErr: any) {
+      console.error("[Chat Verify] Failed to get positions:", posErr);
+      return NextResponse.json({
+        verified: false,
+        error: "Failed to fetch wallet positions"
+      });
+    }
 
     if (positions.length === 0) {
       return NextResponse.json({
