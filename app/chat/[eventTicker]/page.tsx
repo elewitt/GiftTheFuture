@@ -51,17 +51,34 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch market info
+  // Fetch market info - try the ticker, fallback to searching
   useEffect(() => {
     if (eventTicker) {
+      // First try direct market lookup
       fetch(`/api/markets/${encodeURIComponent(eventTicker)}`)
-        .then(res => res.json())
+        .then(res => {
+          if (res.ok) return res.json();
+          // If not found, try searching for markets with this event ticker
+          return fetch(`/api/markets?q=${encodeURIComponent(eventTicker)}&limit=1`)
+            .then(r => r.json())
+            .then(data => {
+              if (data.markets?.[0]) {
+                return { market: data.markets[0] };
+              }
+              return null;
+            });
+        })
         .then(data => {
-          if (data.market?.title) {
+          if (data?.market?.title) {
             setMarketTitle(data.market.title);
+          } else {
+            // Use eventTicker as fallback title
+            setMarketTitle(eventTicker.replace(/-/g, " "));
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          setMarketTitle(eventTicker.replace(/-/g, " "));
+        });
     }
   }, [eventTicker]);
 

@@ -578,7 +578,7 @@ export default function MarketPage() {
 
             {/* Chat Room Link */}
             <Link
-              href={`/chat/${market.eventTicker || ticker}`}
+              href={`/chat/${ticker}`}
               className="block bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-xl p-4 mb-6 hover:border-primary/40 transition group"
             >
               <div className="flex items-center justify-between">
