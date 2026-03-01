@@ -230,66 +230,9 @@ export default function ChatPage() {
     return colors[hash % colors.length];
   };
 
-  // Not authenticated
-  if (ready && !authenticated) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="pt-24 max-w-2xl mx-auto px-5 text-center">
-          <div className="text-6xl mb-6">💬</div>
-          <h1 className="text-2xl font-bold text-foreground mb-4">
-            Token-Gated Chat
-          </h1>
-          <p className="text-muted-foreground mb-6">
-            Sign in to join the conversation. You'll need to hold tokens
-            in this market to participate.
-          </p>
-          <Button onClick={() => window.location.reload()}>
-            Sign In
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // Verifying
-  if (verifying || !verification) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="pt-24 max-w-2xl mx-auto px-5 text-center">
-          <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Verifying your position...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Not verified
-  if (!verification.verified) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="pt-24 max-w-2xl mx-auto px-5 text-center">
-          <div className="text-6xl mb-6">🔒</div>
-          <h1 className="text-2xl font-bold text-foreground mb-4">
-            Access Restricted
-          </h1>
-          <p className="text-muted-foreground mb-6">
-            {error || "You need to hold tokens in this market to join the chat."}
-          </p>
-          <div className="flex gap-4 justify-center">
-            <Link href={`/market/${eventTicker}`}>
-              <Button>Get a Position</Button>
-            </Link>
-            <Link href="/">
-              <Button variant="outline">Browse Markets</Button>
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Determine if user can post (authenticated + verified)
+  const canPost = ready && authenticated && verification?.verified;
+  const isViewOnly = !canPost;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -305,15 +248,25 @@ export default function ChatPage() {
             >
               <span>←</span> Back
             </Link>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Your pick:</span>
-              <span className={`text-xs font-semibold ${getPositionColor(verification.position?.side || "")}`}>
-                {verification.position?.side}
+            {canPost && verification?.position ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Your pick:</span>
+                <span className={`text-xs font-semibold ${getPositionColor(verification.position.side)}`}>
+                  {verification.position.side}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  (${verification.position.value})
+                </span>
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                View only
               </span>
-              <span className="text-xs text-muted-foreground">
-                (${verification.position?.value})
-              </span>
-            </div>
+            )}
           </div>
           <h1 className="text-lg font-bold text-foreground mt-2">
             {chatTitle || eventTicker}
@@ -326,7 +279,9 @@ export default function ChatPage() {
         <div className="max-w-3xl mx-auto px-5 py-4">
           {messages.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-muted-foreground">No messages yet. Start the conversation!</p>
+              <p className="text-muted-foreground">
+                {canPost ? "No messages yet. Start the conversation!" : "No messages yet."}
+              </p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -362,45 +317,81 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* Input */}
+      {/* Input / View-only banner */}
       <div className="border-t border-border bg-card/50 backdrop-blur-sm p-4">
         <div className="max-w-3xl mx-auto">
-          {error && (
-            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 mb-3">
-              <p className="text-xs text-destructive">{error}</p>
+          {canPost ? (
+            <>
+              {error && (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 mb-3">
+                  <p className="text-xs text-destructive">{error}</p>
+                </div>
+              )}
+              <div className="flex gap-3">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  placeholder="Type a message..."
+                  maxLength={500}
+                  className="flex-1 px-4 py-3 bg-secondary border border-transparent rounded-xl text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition"
+                />
+                <Button
+                  onClick={handleSend}
+                  disabled={sending || !newMessage.trim()}
+                  className="px-6"
+                >
+                  {sending ? (
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    "Send"
+                  )}
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground text-center mt-2">
+                Anonymous chat · Position verified on-chain · {messages.length} messages
+              </p>
+            </>
+          ) : (
+            <div className="text-center py-2">
+              <div className="flex items-center justify-center gap-3 mb-2">
+                <span className="text-muted-foreground text-sm">
+                  {!ready || !authenticated
+                    ? "Sign in and get a position to join the conversation"
+                    : verifying
+                      ? "Verifying your position..."
+                      : "Get a position to join the conversation"
+                  }
+                </span>
+              </div>
+              <div className="flex gap-3 justify-center">
+                {!ready || !authenticated ? (
+                  <Button size="sm" onClick={() => window.location.reload()}>
+                    Sign In
+                  </Button>
+                ) : verifying ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <span className="w-4 h-4 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
+                    <span className="text-sm">Checking...</span>
+                  </div>
+                ) : (
+                  <Link href={`/market/${eventTicker}`}>
+                    <Button size="sm">Get a Position</Button>
+                  </Link>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-3">
+                {messages.length} messages · View only mode
+              </p>
             </div>
           )}
-          <div className="flex gap-3">
-            <input
-              ref={inputRef}
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder="Type a message..."
-              maxLength={500}
-              className="flex-1 px-4 py-3 bg-secondary border border-transparent rounded-xl text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition"
-            />
-            <Button
-              onClick={handleSend}
-              disabled={sending || !newMessage.trim()}
-              className="px-6"
-            >
-              {sending ? (
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                "Send"
-              )}
-            </Button>
-          </div>
-          <p className="text-[10px] text-muted-foreground text-center mt-2">
-            Anonymous chat · Position verified on-chain · {messages.length} messages
-          </p>
         </div>
       </div>
     </div>
