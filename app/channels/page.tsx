@@ -35,15 +35,21 @@ export default function ChannelsPage() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [verificationStatus, setVerificationStatus] = useState<Record<string, VerificationStatus>>({});
   const [verifyingChannels, setVerifyingChannels] = useState<Set<string>>(new Set());
 
-  // Fetch available channels (derived from markets)
+  // Fetch channels using same API as front page
   useEffect(() => {
     async function fetchChannels() {
+      setLoading(true);
       try {
-        const res = await fetch("/api/markets?limit=100");
+        // Use same query pattern as front page MarketsSection
+        const url = selectedCategory
+          ? `/api/markets?category=${selectedCategory}&limit=30`
+          : "/api/markets?trending=true&limit=30";
+
+        const res = await fetch(url, { cache: "no-store" });
         const data = await res.json();
 
         if (data.markets) {
@@ -76,7 +82,7 @@ export default function ChannelsPage() {
     }
 
     fetchChannels();
-  }, []);
+  }, [selectedCategory]);
 
   // Generate a friendly channel title
   function generateChannelTitle(ticker: string, marketTitle: string): string {
@@ -149,52 +155,31 @@ export default function ChannelsPage() {
     }
   }, [walletAddress]);
 
-  // Filter channels based on search and category
+  // Filter channels based on search only (category filtering happens at API level)
   const filteredChannels = useMemo(() => {
+    if (!searchQuery) return channels;
+
     return channels.filter(channel => {
-      const matchesSearch = !searchQuery ||
-        channel.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      return channel.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         channel.eventTicker.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesCategory = selectedCategory === "All" || channel.category === selectedCategory;
-
-      return matchesSearch && matchesCategory;
     });
-  }, [channels, searchQuery, selectedCategory]);
+  }, [channels, searchQuery]);
 
-  // Get unique categories
-  const categories = useMemo(() => {
-    const cats = new Set(channels.map(c => c.category));
-    return ["All", ...Array.from(cats)];
-  }, [channels]);
+  // Same category tabs as front page
+  const categories = [
+    { id: null, label: "Trending", icon: "🔥" },
+    { id: "Sports", label: "Sports", icon: "🏆" },
+    { id: "Politics", label: "Politics", icon: "🏛️" },
+    { id: "Economics", label: "Economics", icon: "📈" },
+  ];
 
-  // Get category icon
-  function getCategoryIcon(category: string) {
+  // Get category emoji
+  function getCategoryEmoji(category: string) {
     switch (category) {
-      case "Sports":
-        return (
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-          </svg>
-        );
-      case "Politics":
-        return (
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-          </svg>
-        );
-      case "Economics":
-        return (
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-          </svg>
-        );
-      default:
-        return (
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-        );
+      case "Sports": return "🏆";
+      case "Politics": return "🏛️";
+      case "Economics": return "📈";
+      default: return "💬";
     }
   }
 
@@ -239,21 +224,25 @@ export default function ChannelsPage() {
               />
             </div>
 
-            {/* Category filters */}
+            {/* Category filters - same style as front page */}
             <div className="flex flex-wrap gap-2 mt-4 justify-center">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                    selectedCategory === cat
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
+              {categories.map((cat) => {
+                const isActive = selectedCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id ?? "trending"}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition ${
+                      isActive
+                        ? "bg-gradient-brand text-primary-foreground shadow-lg"
+                        : "border border-border bg-secondary text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <span>{cat.icon}</span>
+                    {cat.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -280,16 +269,14 @@ export default function ChannelsPage() {
                     transition={{ delay: index * 0.05 }}
                     className="bg-card border border-border rounded-xl p-5 hover:border-primary/50 transition"
                   >
-                    <div className="flex items-start gap-4">
-                      <div className="p-3 rounded-lg bg-primary/10 text-primary">
-                        {getCategoryIcon(channel.category)}
-                      </div>
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">{getCategoryEmoji(channel.category)}</span>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-foreground truncate">
+                        <h3 className="font-semibold text-foreground">
                           {channel.title}
                         </h3>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {channel.category} · {channel.marketCount} outcome{channel.marketCount !== 1 ? "s" : ""}
+                          {channel.marketCount} outcome{channel.marketCount !== 1 ? "s" : ""}
                         </p>
                       </div>
                     </div>
