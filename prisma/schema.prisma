@@ -55,3 +55,18 @@ model User {
 
   @@index([privyId])
 }
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  eventTicker    String   // The event this chat is for
+  content        String
+
+  // Anonymous but shows position info
+  walletHash     String   // Hashed wallet address for deduplication
+  positionSide   String   // Which outcome they hold (e.g., "YES", "NO", or outcome name)
+  positionValue  Float    // Dollar value of their position
+
+  @@index([eventTicker, createdAt])
+}

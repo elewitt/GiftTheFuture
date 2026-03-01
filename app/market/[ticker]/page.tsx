@@ -576,6 +576,27 @@ export default function MarketPage() {
               </div>
             </div>
 
+            {/* Chat Room Link */}
+            <Link
+              href={`/chat/${market.eventTicker || ticker}`}
+              className="block bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-xl p-4 mb-6 hover:border-primary/40 transition group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">💬</span>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground group-hover:text-primary transition">
+                      Join the Chat Room
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Token-gated discussion for position holders ($50+ required)
+                    </p>
+                  </div>
+                </div>
+                <span className="text-muted-foreground group-hover:text-primary transition">→</span>
+              </div>
+            </Link>
+
             {/* How it works */}
             <div className="bg-card border border-border rounded-xl p-5">
               <h3 className="text-sm font-semibold text-foreground mb-4">How gifting works</h3>
