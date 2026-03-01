@@ -33,7 +33,7 @@ function FloatingOrb({
 
 export function HeroSection() {
   return (
-    <section className="relative flex min-h-[50vh] items-center justify-center pt-16 pb-32 overflow-hidden">
+    <section className="relative flex min-h-[50vh] items-center justify-center pt-16 pb-32">
       {/* Background gradient */}
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-background to-background" />
