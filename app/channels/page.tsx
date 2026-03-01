@@ -88,10 +88,20 @@ export default function ChannelsPage() {
     fetchChannels();
   }, [selectedCategory]);
 
-  // Generate a friendly channel title
+  // Generate a friendly channel title with full event context
   function generateChannelTitle(ticker: string, marketTitle: string): string {
     const t = ticker.toUpperCase();
     const title = marketTitle || "";
+
+    // Helper to check if title has enough context (not just a name or single word)
+    function hasEnoughContext(text: string): boolean {
+      const words = text.trim().split(/\s+/);
+      // Need at least 3 words OR contains event keywords
+      const eventKeywords = ["finals", "championship", "super bowl", "world series", "march madness",
+        "playoff", "election", "president", "mvp", "award", "winner", "vs", "at", "@"];
+      const hasKeyword = eventKeywords.some(kw => text.toLowerCase().includes(kw));
+      return words.length >= 3 || hasKeyword;
+    }
 
     // Check for single game matchups first (e.g., "Team A vs Team B" or "Team A at Team B")
     const matchupPattern = /(.+?)\s+(?:vs\.?|at|@)\s+(.+?)(?:\s+[-–]\s+|\s*\?|$)/i;
@@ -99,7 +109,6 @@ export default function ChannelsPage() {
     if (matchupMatch) {
       const team1 = matchupMatch[1].replace(/^Will\s+/i, "").trim();
       const team2 = matchupMatch[2].replace(/\s+win.*$/i, "").trim();
-      // Only use matchup if both teams look like team names (not too long)
       if (team1.length < 30 && team2.length < 30 && !team1.includes("Finals") && !team2.includes("Finals")) {
         return `${team1} vs ${team2}`;
       }
@@ -107,11 +116,11 @@ export default function ChannelsPage() {
 
     // Check for "Who will win" pattern with event name
     const winnerMatch = title.match(/Who will win (?:the\s+)?(.+?)(?:\?|$)/i);
-    if (winnerMatch) {
+    if (winnerMatch && hasEnoughContext(winnerMatch[1])) {
       return winnerMatch[1].trim();
     }
 
-    // Extract championship/finals event name
+    // Extract championship/finals event name with year
     const eventMatch = title.match(
       /(?:the\s+)?(\d{4}\s+(?:Pro\s+)?(?:Basketball|Football|Baseball|Hockey|Soccer|NFL|NBA|MLB|NHL)?\s*(?:Finals?|Championship|Super Bowl|World Series|Stanley Cup|March Madness|Playoffs?))/i
     );
@@ -129,31 +138,66 @@ export default function ChannelsPage() {
     // NFL / Super Bowl
     if (t.includes("NFL") || t.includes("SB") || title.toLowerCase().includes("super bowl")) {
       const yearMatch = t.match(/(\d{2,4})/);
-      const year = yearMatch ? (yearMatch[1].length === 2 ? `20${yearMatch[1]}` : yearMatch[1]) : "";
-      return `${year} Super Bowl`.trim();
+      const year = yearMatch ? (yearMatch[1].length === 2 ? `20${yearMatch[1]}` : yearMatch[1]) : "2026";
+      return `${year} Super Bowl`;
     }
 
     // March Madness
     if (t.includes("MARMAD") || t.includes("NCAA") || title.toLowerCase().includes("march madness")) {
       const yearMatch = t.match(/(\d{2,4})/);
-      const year = yearMatch ? (yearMatch[1].length === 2 ? `20${yearMatch[1]}` : yearMatch[1]) : "";
-      return `${year} March Madness`.trim();
+      const year = yearMatch ? (yearMatch[1].length === 2 ? `20${yearMatch[1]}` : yearMatch[1]) : "2026";
+      return `${year} March Madness`;
     }
 
-    // For other markets, try to extract a clean title
-    // Remove "Will X win" prefix and clean up
-    const cleanTitle = title
-      .replace(/^Will\s+(?:the\s+)?/i, "")
-      .replace(/\s+win.*$/i, "")
-      .replace(/\?$/, "")
-      .trim();
+    // Presidential/Political elections
+    if (title.toLowerCase().includes("president") || title.toLowerCase().includes("election")) {
+      const yearMatch = title.match(/(\d{4})/);
+      const year = yearMatch ? yearMatch[1] : "";
+      if (title.toLowerCase().includes("president")) {
+        return `${year} Presidential Election`.trim();
+      }
+      return `${year} Election`.trim();
+    }
 
-    if (cleanTitle && cleanTitle.length < 50) {
+    // MVP Awards
+    if (title.toLowerCase().includes("mvp")) {
+      const sportMatch = title.match(/(NBA|NFL|MLB|NHL)/i);
+      const yearMatch = title.match(/(\d{4})/);
+      const sport = sportMatch ? sportMatch[1].toUpperCase() : "";
+      const year = yearMatch ? yearMatch[1] : "";
+      return `${year} ${sport} MVP`.trim();
+    }
+
+    // Fed Chair / Government appointments
+    if (title.toLowerCase().includes("fed chair") || title.toLowerCase().includes("federal reserve")) {
+      return "Federal Reserve Chair";
+    }
+
+    // For titles that already have good context, use a cleaned version
+    // Extract the core question/event from "Will X win Y?" patterns
+    const willWinMatch = title.match(/Will\s+.+?\s+win\s+(?:the\s+)?(.+?)(?:\?|$)/i);
+    if (willWinMatch && hasEnoughContext(willWinMatch[1])) {
+      return willWinMatch[1].trim();
+    }
+
+    // If the full title has context, clean it up and use it
+    if (hasEnoughContext(title)) {
+      // Clean up common prefixes but keep the context
+      let cleanTitle = title
+        .replace(/^Will\s+/i, "")
+        .replace(/\?$/, "")
+        .trim();
+
+      // Truncate if too long
+      if (cleanTitle.length > 60) {
+        cleanTitle = cleanTitle.substring(0, 57) + "...";
+      }
       return cleanTitle;
     }
 
-    // Final fallback: clean up ticker
-    return ticker.replace(/-/g, " ").replace(/KX/gi, "").trim();
+    // Final fallback: use cleaned ticker with any available context
+    const tickerClean = ticker.replace(/-/g, " ").replace(/KX/gi, "").trim();
+    return tickerClean || title;
   }
 
   // Verify access to a specific channel
