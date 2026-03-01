@@ -1,19 +1,8 @@
 import { NextResponse } from "next/server";
 import { getConnection } from "@/lib/solana";
-import { getOutcomeMints } from "@/lib/dflow";
+import { getActiveEvents, getOutcomeMints, DFlowEvent } from "@/lib/dflow";
 import { PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
-
-const DFLOW_API = process.env.DFLOW_METADATA_API || "https://d.prediction-markets-api.dflow.net";
-
-function getDFlowHeaders(): HeadersInit {
-  const headers: HeadersInit = { "Content-Type": "application/json" };
-  const apiKey = process.env.DFLOW_API_KEY;
-  if (apiKey) {
-    headers["x-api-key"] = apiKey;
-  }
-  return headers;
-}
 
 interface VerificationResult {
   verified: boolean;
@@ -93,46 +82,49 @@ export async function GET(
       return NextResponse.json({ verified: false, error: "No tokens in wallet" });
     }
 
-    // Step 2: Get ALL active markets
-    let markets: any[] = [];
+    // Step 2: Get ALL active events with nested markets (same as rest of app)
+    let events: DFlowEvent[] = [];
     try {
-      const res = await fetch(`${DFLOW_API}/api/v1/markets?status=active&limit=500`, {
-        headers: getDFlowHeaders(),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        markets = data.markets || data || [];
-      }
+      events = await getActiveEvents(500, "active");
+      console.log("[Chat Verify] Total events:", events.length);
     } catch (e) {
-      console.error("[Chat Verify] Failed to fetch markets:", e);
+      console.error("[Chat Verify] Failed to fetch events:", e);
     }
 
-    console.log("[Chat Verify] Total markets:", markets.length);
-
-    // Step 3: For each market, check if user holds its tokens
+    // Step 3: Find markets matching this event ticker
     const eventTickerUpper = eventTicker.toUpperCase();
+    const matchingMarkets: { ticker: string; title: string }[] = [];
 
-    for (const market of markets) {
-      const ticker = (market.ticker || "").toUpperCase();
-      const mEventTicker = (market.eventTicker || "").toUpperCase();
+    for (const event of events) {
+      const evtTicker = (event.ticker || "").toUpperCase();
 
-      // Check if this market belongs to the event we care about
-      const isMatch =
-        ticker === eventTickerUpper ||
-        ticker.startsWith(eventTickerUpper + "-") ||
-        ticker.includes(eventTickerUpper) ||
-        mEventTicker === eventTickerUpper ||
-        mEventTicker.startsWith(eventTickerUpper) ||
-        mEventTicker.includes(eventTickerUpper) ||
-        // Also try partial matching for NBA markets
-        (eventTickerUpper.includes("NBA") && ticker.includes("NBA")) ||
-        (eventTickerUpper.includes("CHAMP") && ticker.includes("CHAMP"));
+      // Check if this event matches
+      const isEventMatch =
+        evtTicker === eventTickerUpper ||
+        evtTicker.includes(eventTickerUpper) ||
+        eventTickerUpper.includes(evtTicker) ||
+        // NBA-specific matching
+        (eventTickerUpper.includes("NBA") && evtTicker.includes("NBA")) ||
+        (eventTickerUpper.includes("CHAMP") && evtTicker.includes("CHAMP"));
 
-      if (!isMatch) continue;
+      if (!isEventMatch) continue;
 
-      // Get the YES/NO mints for this market
+      // Add all markets from this event
+      if (event.markets) {
+        for (const market of event.markets) {
+          matchingMarkets.push({ ticker: market.ticker, title: market.title });
+        }
+      }
+    }
+
+    console.log("[Chat Verify] Matching markets:", matchingMarkets.length);
+    matchingMarkets.forEach(m => console.log("[Chat Verify]   -", m.ticker));
+
+    // Step 4: Check if user holds tokens for any matching market
+    for (const market of matchingMarkets) {
       try {
         const mints = await getOutcomeMints(market.ticker);
+        console.log("[Chat Verify] Checking market", market.ticker, "mints:", mints.yesMint, mints.noMint);
 
         // Check if user holds YES tokens
         const yesHolding = holdings.find(h => h.mint === mints.yesMint);
@@ -160,8 +152,8 @@ export async function GET(
             position: { side: "NO", value: noHolding.balance, ticker: market.ticker },
           });
         }
-      } catch {
-        // Skip markets where we can't get mints
+      } catch (err) {
+        console.log("[Chat Verify] Skipping market", market.ticker, "- could not get mints");
         continue;
       }
     }

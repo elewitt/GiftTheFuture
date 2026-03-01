@@ -1,22 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getConnection } from "@/lib/solana";
-import { getOutcomeMints } from "@/lib/dflow";
+import { getActiveEvents, getOutcomeMints, DFlowEvent } from "@/lib/dflow";
 import { PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import crypto from "crypto";
 
 const MAX_MESSAGES = 100;
-const DFLOW_API = process.env.DFLOW_METADATA_API || "https://d.prediction-markets-api.dflow.net";
-
-function getDFlowHeaders(): HeadersInit {
-  const headers: HeadersInit = { "Content-Type": "application/json" };
-  const apiKey = process.env.DFLOW_API_KEY;
-  if (apiKey) {
-    headers["x-api-key"] = apiKey;
-  }
-  return headers;
-}
 
 interface ChatMessageResponse {
   id: string;
@@ -120,54 +110,58 @@ async function verifyPosition(
     // Not a direct market ticker, try searching
   }
 
-  // Search for matching markets
+  // Search for matching markets using getActiveEvents (same as rest of app)
   try {
-    const res = await fetch(`${DFLOW_API}/api/v1/markets?status=active&limit=200`, {
-      headers: getDFlowHeaders(),
-    });
+    const events: DFlowEvent[] = await getActiveEvents(500, "active");
+    const eventTickerUpper = eventTicker.toUpperCase();
 
-    if (res.ok) {
-      const data = await res.json();
-      const markets = data.markets || data || [];
-      const eventTickerUpper = eventTicker.toUpperCase();
+    // Find matching events and their markets
+    const matchingMarkets: { ticker: string; title: string }[] = [];
+    for (const event of events) {
+      const evtTicker = (event.ticker || "").toUpperCase();
+      const isMatch =
+        evtTicker === eventTickerUpper ||
+        evtTicker.includes(eventTickerUpper) ||
+        eventTickerUpper.includes(evtTicker) ||
+        (eventTickerUpper.includes("NBA") && evtTicker.includes("NBA")) ||
+        (eventTickerUpper.includes("CHAMP") && evtTicker.includes("CHAMP"));
 
-      const matchingMarkets = markets.filter((m: any) => {
-        const ticker = (m.ticker || "").toUpperCase();
-        return ticker === eventTickerUpper ||
-               ticker.startsWith(eventTickerUpper + "-") ||
-               (m.eventTicker || "").toUpperCase() === eventTickerUpper;
-      });
-
-      for (const market of matchingMarkets) {
-        try {
-          const mints = await getOutcomeMints(market.ticker);
-
-          // Extract outcome name from ticker or title
-          let outcomeName = "YES";
-          const tickerParts = market.ticker.split("-");
-          if (tickerParts.length > 0) {
-            outcomeName = tickerParts[tickerParts.length - 1];
-          }
-          // Try to get better name from title
-          if (market.title) {
-            const titleMatch = market.title.match(/Will\s+(?:the\s+)?(.+?)\s+win/i);
-            if (titleMatch) {
-              outcomeName = titleMatch[1];
-            }
-          }
-
-          const yesHolding = holdings.find(h => h.mint === mints.yesMint);
-          if (yesHolding) {
-            return { side: outcomeName, value: yesHolding.balance, ticker: market.ticker };
-          }
-
-          const noHolding = holdings.find(h => h.mint === mints.noMint);
-          if (noHolding) {
-            return { side: `NO ${outcomeName}`, value: noHolding.balance, ticker: market.ticker };
-          }
-        } catch {
-          continue;
+      if (isMatch && event.markets) {
+        for (const market of event.markets) {
+          matchingMarkets.push({ ticker: market.ticker, title: market.title });
         }
+      }
+    }
+
+    for (const market of matchingMarkets) {
+      try {
+        const mints = await getOutcomeMints(market.ticker);
+
+        // Extract outcome name from ticker or title
+        let outcomeName = "YES";
+        const tickerParts = market.ticker.split("-");
+        if (tickerParts.length > 0) {
+          outcomeName = tickerParts[tickerParts.length - 1];
+        }
+        // Try to get better name from title
+        if (market.title) {
+          const titleMatch = market.title.match(/Will\s+(?:the\s+)?(.+?)\s+win/i);
+          if (titleMatch) {
+            outcomeName = titleMatch[1];
+          }
+        }
+
+        const yesHolding = holdings.find(h => h.mint === mints.yesMint);
+        if (yesHolding) {
+          return { side: outcomeName, value: yesHolding.balance, ticker: market.ticker };
+        }
+
+        const noHolding = holdings.find(h => h.mint === mints.noMint);
+        if (noHolding) {
+          return { side: `NO ${outcomeName}`, value: noHolding.balance, ticker: market.ticker };
+        }
+      } catch {
+        continue;
       }
     }
   } catch (e) {
