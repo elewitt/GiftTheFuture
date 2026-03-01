@@ -65,14 +65,23 @@ export async function GET(
     const connection = getConnection();
     const pubkey = new PublicKey(wallet);
 
-    const [legacyAccounts, token2022Accounts] = await Promise.all([
-      connection.getParsedTokenAccountsByOwner(pubkey, {
-        programId: TOKEN_PROGRAM_ID,
-      }),
-      connection.getParsedTokenAccountsByOwner(pubkey, {
-        programId: TOKEN_2022_PROGRAM_ID,
-      }),
-    ]);
+    let legacyAccounts, token2022Accounts;
+    try {
+      [legacyAccounts, token2022Accounts] = await Promise.all([
+        connection.getParsedTokenAccountsByOwner(pubkey, {
+          programId: TOKEN_PROGRAM_ID,
+        }),
+        connection.getParsedTokenAccountsByOwner(pubkey, {
+          programId: TOKEN_2022_PROGRAM_ID,
+        }),
+      ]);
+    } catch (rpcErr: any) {
+      console.error("[Chat Verify] RPC error fetching token accounts:", rpcErr.message);
+      return NextResponse.json({
+        verified: false,
+        error: "Failed to fetch wallet tokens from Solana"
+      });
+    }
 
     const allAccounts = [...legacyAccounts.value, ...token2022Accounts.value];
     const holdings = allAccounts
@@ -83,6 +92,7 @@ export async function GET(
       .filter((h) => h.balance > 0);
 
     console.log("[Chat Verify] Found", holdings.length, "token holdings");
+    console.log("[Chat Verify] Holdings:", holdings.map(h => ({ mint: h.mint.slice(0, 8) + "...", balance: h.balance })));
 
     if (holdings.length === 0) {
       return NextResponse.json({
@@ -116,20 +126,30 @@ export async function GET(
           const markets = data.markets || data || [];
 
           // Find markets matching this event ticker
+          const eventTickerUpper = eventTicker.toUpperCase();
           const matchingMarkets = markets.filter((m: any) => {
             const ticker = (m.ticker || "").toUpperCase();
-            const eventTickerUpper = eventTicker.toUpperCase();
+            const mEventTicker = (m.eventTicker || "").toUpperCase();
             return ticker === eventTickerUpper ||
                    ticker.startsWith(eventTickerUpper + "-") ||
-                   (m.eventTicker || "").toUpperCase() === eventTickerUpper;
+                   mEventTicker === eventTickerUpper ||
+                   mEventTicker.startsWith(eventTickerUpper);
           });
 
+          console.log("[Chat Verify] Looking for event:", eventTickerUpper);
           console.log("[Chat Verify] Found", matchingMarkets.length, "matching markets");
+          if (matchingMarkets.length > 0) {
+            console.log("[Chat Verify] Matching market tickers:", matchingMarkets.slice(0, 5).map((m: any) => m.ticker));
+          } else {
+            // Log some sample tickers to help debug
+            console.log("[Chat Verify] Sample market tickers:", markets.slice(0, 5).map((m: any) => ({ ticker: m.ticker, eventTicker: m.eventTicker })));
+          }
 
           // Check if wallet holds any tokens from any matching market
           for (const market of matchingMarkets) {
             try {
               const mints = await getOutcomeMints(market.ticker);
+              console.log("[Chat Verify] Checking market", market.ticker, "- YES mint:", mints.yesMint?.slice(0, 8), "NO mint:", mints.noMint?.slice(0, 8));
 
               // Extract outcome name from ticker or title
               // e.g., KXNBA-26-CHAMP-SAS -> "SAS" or from title "Will the San Antonio..."
