@@ -4,7 +4,7 @@ import { getPositions } from "@/lib/solana";
 import { getMarket } from "@/lib/dflow";
 import crypto from "crypto";
 
-const MINIMUM_POSITION_VALUE = 50;
+const MINIMUM_POSITION_VALUE = 1; // $1 minimum (for testing)
 const MAX_MESSAGES = 100;
 
 interface ChatMessageResponse {

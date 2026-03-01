@@ -191,7 +191,7 @@ export default function ChatPage() {
             Token-Gated Chat
           </h1>
           <p className="text-muted-foreground mb-6">
-            Sign in to join the conversation. You'll need to hold at least $50
+            Sign in to join the conversation. You'll need to hold at least $1
             worth of a position in this market to participate.
           </p>
           <Button onClick={() => window.location.reload()}>
@@ -226,7 +226,7 @@ export default function ChatPage() {
             Access Restricted
           </h1>
           <p className="text-muted-foreground mb-6">
-            {error || "You need to hold at least $50 worth of a position in this market to join the chat."}
+            {error || "You need to hold at least $1 worth of a position in this market to join the chat."}
           </p>
           <div className="flex gap-4 justify-center">
             <Link href={`/market/${eventTicker}`}>

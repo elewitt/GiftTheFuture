@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getPositions, Position } from "@/lib/solana";
 import { getOutcomeMints, getMarket } from "@/lib/dflow";
 
-const MINIMUM_POSITION_VALUE = 50; // $50 minimum
+const MINIMUM_POSITION_VALUE = 1; // $1 minimum (for testing)
 
 interface VerificationResult {
   verified: boolean;

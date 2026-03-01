@@ -589,7 +589,7 @@ export default function MarketPage() {
                       Join the Chat Room
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Token-gated discussion for position holders ($50+ required)
+                      Token-gated discussion for position holders ($1+ required)
                     </p>
                   </div>
                 </div>
