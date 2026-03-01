@@ -75,7 +75,7 @@ export function MarchMadnessPromo() {
         <div className="text-4xl mb-3">🎉</div>
         <h3 className="text-xl font-bold text-foreground mb-2">Gift Sent!</h3>
         <p className="text-muted-foreground text-sm mb-4">
-          Your friend will receive an email with their March Madness prediction gift.
+          Your friend will receive an email with their NBA Finals prediction gift.
         </p>
         <Button
           variant="outline"
@@ -100,7 +100,7 @@ export function MarchMadnessPromo() {
           <span>🏀</span> FREE GIFT
         </div>
         <h3 className="text-lg font-bold text-foreground">
-          Send a friend $1 on March Madness
+          Send a friend $1 on the NBA Finals
         </h3>
         <p className="text-sm text-muted-foreground mt-1">
           Pick a team, enter their email, and we&apos;ll send them a free prediction

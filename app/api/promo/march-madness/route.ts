@@ -7,22 +7,75 @@ import {
 } from "@/lib/solana";
 import { createGift, updateGift } from "@/lib/gifts";
 
-// March Madness 2025 event ticker - markets are like KXMARMAD-25-{TEAM}
-const MARCH_MADNESS_EVENT = "KXMARMAD-25";
+const DFLOW_API = process.env.DFLOW_METADATA_API || "https://d.prediction-markets-api.dflow.net";
 
-// Top teams for the dropdown (will be matched to market tickers)
-const TOP_TEAMS: { name: string; ticker: string }[] = [
-  { name: "Duke", ticker: "KXMARMAD-25-DUKE" },
-  { name: "Auburn", ticker: "KXMARMAD-25-AUB" },
-  { name: "Houston", ticker: "KXMARMAD-25-HOU" },
-  { name: "Florida", ticker: "KXMARMAD-25-FLA" },
-  { name: "Tennessee", ticker: "KXMARMAD-25-TENN" },
-  { name: "Alabama", ticker: "KXMARMAD-25-BAMA" },
-  { name: "Iowa State", ticker: "KXMARMAD-25-ISU" },
-];
+function getDFlowHeaders(): HeadersInit {
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  const apiKey = process.env.DFLOW_API_KEY;
+  if (apiKey) headers["x-api-key"] = apiKey;
+  return headers;
+}
 
 // Promo amount in USDC
 const PROMO_AMOUNT_USDC = 1;
+
+// Cache for teams (refreshed on each GET)
+let cachedTeams: { name: string; ticker: string; title: string }[] = [];
+let cacheTime = 0;
+const CACHE_TTL = 60000; // 1 minute
+
+async function fetchNBATeams(): Promise<{ name: string; ticker: string; title: string }[]> {
+  // Return cached if fresh
+  if (cachedTeams.length > 0 && Date.now() - cacheTime < CACHE_TTL) {
+    return cachedTeams;
+  }
+
+  try {
+    const res = await fetch(`${DFLOW_API}/api/v1/markets?status=active&limit=200`, {
+      headers: getDFlowHeaders(),
+    });
+
+    if (!res.ok) return cachedTeams;
+
+    const data = await res.json();
+    const markets = data.markets || data || [];
+
+    // Find NBA Finals markets (KXNBA-26-{TEAM})
+    const nbaMarkets = markets.filter((m: any) => {
+      const ticker = (m.ticker || "").toUpperCase();
+      return ticker.includes("KXNBA") && ticker.includes("-26-");
+    });
+
+    // Extract team names from titles and sort by volume/probability
+    const teams = nbaMarkets
+      .map((m: any) => {
+        // Extract team name from title like "Will the Oklahoma City win the 2026 Pro Basketball Finals?"
+        const title = m.title || "";
+        const match = title.match(/Will\s+(?:the\s+)?(.+?)\s+win/i);
+        const teamName = match ? match[1] : m.ticker.split("-").pop();
+
+        return {
+          name: teamName,
+          ticker: m.ticker,
+          title: m.title,
+          volume: m.volume || 0,
+        };
+      })
+      .sort((a: any, b: any) => b.volume - a.volume)
+      .slice(0, 7) // Top 7 by volume
+      .map(({ name, ticker, title }: any) => ({ name, ticker, title }));
+
+    if (teams.length > 0) {
+      cachedTeams = teams;
+      cacheTime = Date.now();
+    }
+
+    return teams;
+  } catch (err) {
+    console.error("[Promo] Failed to fetch NBA teams:", err);
+    return cachedTeams;
+  }
+}
 
 /**
  * GET /api/promo/march-madness
@@ -30,10 +83,12 @@ const PROMO_AMOUNT_USDC = 1;
  * Returns the list of available teams for the promo
  */
 export async function GET() {
+  const teams = await fetchNBATeams();
+
   return NextResponse.json({
-    teams: TOP_TEAMS.map(t => ({ name: t.name, value: t.ticker })),
+    teams: teams.map(t => ({ name: t.name, value: t.ticker })),
     amount: PROMO_AMOUNT_USDC,
-    eventName: "2025 March Madness",
+    eventName: "2026 NBA Finals",
   });
 }
 
@@ -70,7 +125,8 @@ export async function POST(req: Request) {
     }
 
     // Validate team is in our allowed list
-    const selectedTeam = TOP_TEAMS.find(t => t.ticker === teamTicker);
+    const teams = await fetchNBATeams();
+    const selectedTeam = teams.find(t => t.ticker === teamTicker);
     if (!selectedTeam) {
       return NextResponse.json(
         { error: "Invalid team selection" },
@@ -78,7 +134,7 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log("[Promo] Creating March Madness gift:", {
+    console.log("[Promo] Creating NBA Finals gift:", {
       recipientEmail,
       senderName,
       team: selectedTeam.name,
@@ -99,7 +155,7 @@ export async function POST(req: Request) {
     }
 
     // 2. Create gift record
-    const marketTitle = `Will ${selectedTeam.name} win the 2025 NCAA Tournament?`;
+    const marketTitle = selectedTeam.title || `Will ${selectedTeam.name} win the 2026 NBA Finals?`;
     const gift = await createGift({
       marketTicker: teamTicker,
       marketTitle,
@@ -107,10 +163,10 @@ export async function POST(req: Request) {
       outcomeMint: yesMint,
       tokenAmount: 0,
       costUSDC: PROMO_AMOUNT_USDC,
-      senderPrivyId: "promo-march-madness",
+      senderPrivyId: "promo-nba-finals",
       recipientName: "",
       recipientContact: recipientEmail,
-      giftMessage: `${senderName} thinks ${selectedTeam.name} will win March Madness! Here's $1 on them.`,
+      giftMessage: `${senderName} thinks ${selectedTeam.name} will win the NBA Finals! Here's $1 on them.`,
     });
 
     // 3. Create trade order via DFlow
@@ -178,7 +234,7 @@ export async function POST(req: Request) {
           marketTitle,
           side: "yes",
           shares: displayTokens,
-          giftMessage: `${senderName} thinks ${selectedTeam.name} will win March Madness!`,
+          giftMessage: `${senderName} thinks ${selectedTeam.name} will win the NBA Finals!`,
           claimUrl,
         }),
       });
