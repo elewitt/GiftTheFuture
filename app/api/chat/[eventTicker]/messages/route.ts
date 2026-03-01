@@ -1,12 +1,22 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getConnection } from "@/lib/solana";
-import { getActiveEvents, getOutcomeMints, DFlowEvent } from "@/lib/dflow";
+import { getOutcomeMints } from "@/lib/dflow";
 import { PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import crypto from "crypto";
 
 const MAX_MESSAGES = 100;
+const DFLOW_API = process.env.DFLOW_METADATA_API || "https://d.prediction-markets-api.dflow.net";
+
+function getDFlowHeaders(): HeadersInit {
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  const apiKey = process.env.DFLOW_API_KEY;
+  if (apiKey) {
+    headers["x-api-key"] = apiKey;
+  }
+  return headers;
+}
 
 interface ChatMessageResponse {
   id: string;
@@ -110,28 +120,37 @@ async function verifyPosition(
     // Not a direct market ticker, try searching
   }
 
-  // Search for matching markets using getActiveEvents (same as rest of app)
+  // Search for matching markets using direct API call (same as /api/markets route)
   try {
-    const events: DFlowEvent[] = await getActiveEvents(500, "active");
+    const res = await fetch(`${DFLOW_API}/api/v1/markets?status=active&limit=200`, {
+      headers: getDFlowHeaders(),
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      console.error("[Chat Messages] Markets API error:", res.status);
+      return null;
+    }
+
+    const data = await res.json();
+    const allMarkets: { ticker: string; eventTicker?: string; title: string }[] = data.markets || data || [];
     const eventTickerUpper = eventTicker.toUpperCase();
 
-    // Find matching events and their markets
-    const matchingMarkets: { ticker: string; title: string }[] = [];
-    for (const event of events) {
-      const evtTicker = (event.ticker || "").toUpperCase();
-      const isMatch =
-        evtTicker === eventTickerUpper ||
-        evtTicker.includes(eventTickerUpper) ||
-        eventTickerUpper.includes(evtTicker) ||
-        (eventTickerUpper.includes("NBA") && evtTicker.includes("NBA")) ||
-        (eventTickerUpper.includes("CHAMP") && evtTicker.includes("CHAMP"));
-
-      if (isMatch && event.markets) {
-        for (const market of event.markets) {
-          matchingMarkets.push({ ticker: market.ticker, title: market.title });
-        }
-      }
-    }
+    // Find matching markets
+    const matchingMarkets = allMarkets.filter(m => {
+      const ticker = (m.ticker || "").toUpperCase();
+      const mEventTicker = (m.eventTicker || "").toUpperCase();
+      return (
+        ticker === eventTickerUpper ||
+        ticker.startsWith(eventTickerUpper + "-") ||
+        ticker.includes(eventTickerUpper) ||
+        mEventTicker === eventTickerUpper ||
+        mEventTicker.startsWith(eventTickerUpper) ||
+        mEventTicker.includes(eventTickerUpper) ||
+        (eventTickerUpper.includes("NBA") && ticker.includes("NBA")) ||
+        (eventTickerUpper.includes("CHAMP") && ticker.includes("CHAMP"))
+      );
+    });
 
     for (const market of matchingMarkets) {
       try {

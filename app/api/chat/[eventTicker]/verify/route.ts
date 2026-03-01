@@ -1,8 +1,19 @@
 import { NextResponse } from "next/server";
 import { getConnection } from "@/lib/solana";
-import { getActiveEvents, getOutcomeMints, DFlowEvent } from "@/lib/dflow";
+import { getOutcomeMints } from "@/lib/dflow";
 import { PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+
+const DFLOW_API = process.env.DFLOW_METADATA_API || "https://d.prediction-markets-api.dflow.net";
+
+function getDFlowHeaders(): HeadersInit {
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  const apiKey = process.env.DFLOW_API_KEY;
+  if (apiKey) {
+    headers["x-api-key"] = apiKey;
+  }
+  return headers;
+}
 
 interface VerificationResult {
   verified: boolean;
@@ -82,40 +93,52 @@ export async function GET(
       return NextResponse.json({ verified: false, error: "No tokens in wallet" });
     }
 
-    // Step 2: Get ALL active events with nested markets (same as rest of app)
-    let events: DFlowEvent[] = [];
+    // Step 2: Fetch ALL active markets from DFlow (same approach as /api/markets route)
+    interface DFlowMarket {
+      ticker: string;
+      eventTicker?: string;
+      title: string;
+    }
+
+    let allMarkets: DFlowMarket[] = [];
     try {
-      events = await getActiveEvents(500, "active");
-      console.log("[Chat Verify] Total events:", events.length);
-    } catch (e) {
-      console.error("[Chat Verify] Failed to fetch events:", e);
+      const res = await fetch(`${DFLOW_API}/api/v1/markets?status=active&limit=200`, {
+        headers: getDFlowHeaders(),
+        cache: "no-store",
+      });
+
+      console.log("[Chat Verify] Markets API status:", res.status);
+
+      if (res.ok) {
+        const data = await res.json();
+        allMarkets = data.markets || data || [];
+        console.log("[Chat Verify] Total markets fetched:", allMarkets.length);
+      } else {
+        const errText = await res.text();
+        console.error("[Chat Verify] Markets API error:", errText.slice(0, 200));
+      }
+    } catch (e: any) {
+      console.error("[Chat Verify] Failed to fetch markets:", e.message || e);
     }
 
     // Step 3: Find markets matching this event ticker
     const eventTickerUpper = eventTicker.toUpperCase();
-    const matchingMarkets: { ticker: string; title: string }[] = [];
+    const matchingMarkets = allMarkets.filter(m => {
+      const ticker = (m.ticker || "").toUpperCase();
+      const mEventTicker = (m.eventTicker || "").toUpperCase();
 
-    for (const event of events) {
-      const evtTicker = (event.ticker || "").toUpperCase();
-
-      // Check if this event matches
-      const isEventMatch =
-        evtTicker === eventTickerUpper ||
-        evtTicker.includes(eventTickerUpper) ||
-        eventTickerUpper.includes(evtTicker) ||
+      return (
+        ticker === eventTickerUpper ||
+        ticker.startsWith(eventTickerUpper + "-") ||
+        ticker.includes(eventTickerUpper) ||
+        mEventTicker === eventTickerUpper ||
+        mEventTicker.startsWith(eventTickerUpper) ||
+        mEventTicker.includes(eventTickerUpper) ||
         // NBA-specific matching
-        (eventTickerUpper.includes("NBA") && evtTicker.includes("NBA")) ||
-        (eventTickerUpper.includes("CHAMP") && evtTicker.includes("CHAMP"));
-
-      if (!isEventMatch) continue;
-
-      // Add all markets from this event
-      if (event.markets) {
-        for (const market of event.markets) {
-          matchingMarkets.push({ ticker: market.ticker, title: market.title });
-        }
-      }
-    }
+        (eventTickerUpper.includes("NBA") && ticker.includes("NBA")) ||
+        (eventTickerUpper.includes("CHAMP") && ticker.includes("CHAMP"))
+      );
+    });
 
     console.log("[Chat Verify] Matching markets:", matchingMarkets.length);
     matchingMarkets.forEach(m => console.log("[Chat Verify]   -", m.ticker));
