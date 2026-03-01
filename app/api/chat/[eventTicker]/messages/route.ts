@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getPositions } from "@/lib/solana";
+import { getConnection } from "@/lib/solana";
+import { getOutcomeMints } from "@/lib/dflow";
+import { PublicKey } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import crypto from "crypto";
 
-// No minimum - just need to hold any tokens
 const MAX_MESSAGES = 100;
+const DFLOW_API = process.env.DFLOW_METADATA_API || "https://d.prediction-markets-api.dflow.net";
 
 interface ChatMessageResponse {
   id: string;
@@ -60,10 +63,105 @@ export async function GET(
 }
 
 /**
+ * Verify wallet holds tokens for the market and return position info
+ */
+async function verifyPosition(
+  wallet: string,
+  eventTicker: string
+): Promise<{ side: string; value: number; ticker: string } | null> {
+  // Get all token accounts for this wallet
+  const connection = getConnection();
+  const pubkey = new PublicKey(wallet);
+
+  const [legacyAccounts, token2022Accounts] = await Promise.all([
+    connection.getParsedTokenAccountsByOwner(pubkey, {
+      programId: TOKEN_PROGRAM_ID,
+    }),
+    connection.getParsedTokenAccountsByOwner(pubkey, {
+      programId: TOKEN_2022_PROGRAM_ID,
+    }),
+  ]);
+
+  const allAccounts = [...legacyAccounts.value, ...token2022Accounts.value];
+  const holdings = allAccounts
+    .map((account) => ({
+      mint: account.account.data.parsed.info.mint as string,
+      balance: account.account.data.parsed.info.tokenAmount.uiAmount as number,
+    }))
+    .filter((h) => h.balance > 0);
+
+  if (holdings.length === 0) {
+    return null;
+  }
+
+  // Try direct market lookup first
+  try {
+    const mints = await getOutcomeMints(eventTicker);
+
+    const yesHolding = holdings.find(h => h.mint === mints.yesMint);
+    if (yesHolding) {
+      return { side: "YES", value: yesHolding.balance, ticker: eventTicker };
+    }
+
+    const noHolding = holdings.find(h => h.mint === mints.noMint);
+    if (noHolding) {
+      return { side: "NO", value: noHolding.balance, ticker: eventTicker };
+    }
+  } catch {
+    // Not a direct market ticker, try searching
+  }
+
+  // Search for matching markets
+  try {
+    const res = await fetch(`${DFLOW_API}/api/v1/markets?status=active&limit=200`, {
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const markets = data.markets || data || [];
+      const eventTickerUpper = eventTicker.toUpperCase();
+
+      const matchingMarkets = markets.filter((m: any) => {
+        const ticker = (m.ticker || "").toUpperCase();
+        return ticker === eventTickerUpper ||
+               ticker.startsWith(eventTickerUpper + "-") ||
+               (m.eventTicker || "").toUpperCase() === eventTickerUpper;
+      });
+
+      for (const market of matchingMarkets) {
+        try {
+          const mints = await getOutcomeMints(market.ticker);
+
+          const yesHolding = holdings.find(h => h.mint === mints.yesMint);
+          if (yesHolding) {
+            // Extract outcome name from ticker for multi-outcome markets
+            const tickerParts = market.ticker.split("-");
+            const sideName = tickerParts.length > 3 ? tickerParts[tickerParts.length - 1] : "YES";
+            return { side: sideName, value: yesHolding.balance, ticker: market.ticker };
+          }
+
+          const noHolding = holdings.find(h => h.mint === mints.noMint);
+          if (noHolding) {
+            return { side: "NO", value: noHolding.balance, ticker: market.ticker };
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+  } catch (e) {
+    console.error("[Chat Messages] Failed to search markets:", e);
+  }
+
+  return null;
+}
+
+/**
  * POST /api/chat/[eventTicker]/messages
  *
  * Send a message to the chat room.
- * Requires holding $50+ position in the event.
+ * Requires holding any position in the market.
  */
 export async function POST(
   req: Request,
@@ -93,38 +191,7 @@ export async function POST(
     }
 
     // Verify position
-    const positions = await getPositions(wallet);
-    const eventTickerUpper = eventTicker.toUpperCase();
-
-    let verifiedPosition: { side: string; value: number; ticker: string } | null = null;
-
-    for (const position of positions) {
-      if (!position.market) continue;
-
-      const marketTicker = position.market.ticker.toUpperCase();
-      const matches = marketTicker === eventTickerUpper ||
-                     marketTicker.startsWith(eventTickerUpper + "-") ||
-                     marketTicker.startsWith(eventTickerUpper);
-
-      if (!matches) continue;
-
-      // Found a matching position - user is verified
-      // For multi-outcome markets, extract the outcome name from ticker
-      // e.g., KXNBA-MVP-2025-SGIL -> SGIL (Shai Gilgeous-Alexander)
-      let sideName: string = position.side;
-      const tickerParts = position.market.ticker.split("-");
-      if (tickerParts.length > 3) {
-        // Use the last part as the outcome identifier
-        sideName = tickerParts[tickerParts.length - 1];
-      }
-
-      verifiedPosition = {
-        side: sideName,
-        value: position.balance, // Just show token count
-        ticker: position.market.ticker,
-      };
-      break;
-    }
+    const verifiedPosition = await verifyPosition(wallet, eventTicker);
 
     if (!verifiedPosition) {
       return NextResponse.json({
