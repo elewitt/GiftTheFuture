@@ -107,14 +107,40 @@ export async function GET(
 
 function transformDFlowMarket(m: DFlowMarketFull) {
   // DFlow prices are strings like "0.0600"
-  const yesBid = parseFloat(m.yesBid || "0.5");
-  const yesAsk = parseFloat(m.yesAsk || "0.5");
-  const noBid = parseFloat(m.noBid || "0.5");
-  const noAsk = parseFloat(m.noAsk || "0.5");
+  // Handle null values properly - don't default to 0.5 as that causes incorrect prices
+  const yesBidRaw = m.yesBid ? parseFloat(m.yesBid) : null;
+  const yesAskRaw = m.yesAsk ? parseFloat(m.yesAsk) : null;
+  const noBidRaw = m.noBid ? parseFloat(m.noBid) : null;
+  const noAskRaw = m.noAsk ? parseFloat(m.noAsk) : null;
 
-  // Use midpoint of bid/ask for display
-  const yesPrice = (yesBid + yesAsk) / 2;
-  const noPrice = (noBid + noAsk) / 2;
+  // Calculate price: use midpoint if both exist, single value if one exists, 0 if neither
+  let yesPrice: number;
+  if (yesBidRaw !== null && yesAskRaw !== null) {
+    yesPrice = (yesBidRaw + yesAskRaw) / 2;
+  } else if (yesAskRaw !== null) {
+    yesPrice = yesAskRaw;
+  } else if (yesBidRaw !== null) {
+    yesPrice = yesBidRaw;
+  } else {
+    yesPrice = 0;
+  }
+
+  let noPrice: number;
+  if (noBidRaw !== null && noAskRaw !== null) {
+    noPrice = (noBidRaw + noAskRaw) / 2;
+  } else if (noAskRaw !== null) {
+    noPrice = noAskRaw;
+  } else if (noBidRaw !== null) {
+    noPrice = noBidRaw;
+  } else {
+    noPrice = 0;
+  }
+
+  // Export the parsed values (or 0 if null)
+  const yesBid = yesBidRaw ?? 0;
+  const yesAsk = yesAskRaw ?? 0;
+  const noBid = noBidRaw ?? 0;
+  const noAsk = noAskRaw ?? 0;
 
   return {
     ticker: m.ticker,

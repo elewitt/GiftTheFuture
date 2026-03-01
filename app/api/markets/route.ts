@@ -240,12 +240,27 @@ export async function GET(req: Request) {
 
       if (allSameTitle) {
         const potentialOutcomes = siblings
-          .map(s => ({
-            ticker: s.ticker,
-            title: s.title,
-            yesPrice: parseFloat(s.yesAsk || s.yesBid || "0.5"),
-            label: getOutcomeLabel(s.ticker, s.title, siblings),
-          }))
+          .map(s => {
+            // Calculate price properly - use midpoint if both exist, single value if one exists, 0 if neither
+            const bidRaw = s.yesBid ? parseFloat(s.yesBid) : null;
+            const askRaw = s.yesAsk ? parseFloat(s.yesAsk) : null;
+            let yesPrice: number;
+            if (bidRaw !== null && askRaw !== null) {
+              yesPrice = (bidRaw + askRaw) / 2;
+            } else if (askRaw !== null) {
+              yesPrice = askRaw;
+            } else if (bidRaw !== null) {
+              yesPrice = bidRaw;
+            } else {
+              yesPrice = 0;
+            }
+            return {
+              ticker: s.ticker,
+              title: s.title,
+              yesPrice,
+              label: getOutcomeLabel(s.ticker, s.title, siblings),
+            };
+          })
           .sort((a, b) => b.yesPrice - a.yesPrice);
 
         // Check if labels are actually different
@@ -284,14 +299,40 @@ export async function GET(req: Request) {
 
 function transformDFlowMarket(m: DFlowMarketFull) {
   // DFlow prices are strings like "0.0600"
-  const yesBid = parseFloat(m.yesBid || "0.5");
-  const yesAsk = parseFloat(m.yesAsk || "0.5");
-  const noBid = parseFloat(m.noBid || "0.5");
-  const noAsk = parseFloat(m.noAsk || "0.5");
+  // Handle null values properly - don't default to 0.5 as that causes incorrect prices
+  const yesBidRaw = m.yesBid ? parseFloat(m.yesBid) : null;
+  const yesAskRaw = m.yesAsk ? parseFloat(m.yesAsk) : null;
+  const noBidRaw = m.noBid ? parseFloat(m.noBid) : null;
+  const noAskRaw = m.noAsk ? parseFloat(m.noAsk) : null;
 
-  // Use midpoint of bid/ask for display
-  const yesPrice = (yesBid + yesAsk) / 2;
-  const noPrice = (noBid + noAsk) / 2;
+  // Calculate price: use midpoint if both exist, single value if one exists, 0 if neither
+  let yesPrice: number;
+  if (yesBidRaw !== null && yesAskRaw !== null) {
+    yesPrice = (yesBidRaw + yesAskRaw) / 2;
+  } else if (yesAskRaw !== null) {
+    yesPrice = yesAskRaw;
+  } else if (yesBidRaw !== null) {
+    yesPrice = yesBidRaw;
+  } else {
+    yesPrice = 0;
+  }
+
+  let noPrice: number;
+  if (noBidRaw !== null && noAskRaw !== null) {
+    noPrice = (noBidRaw + noAskRaw) / 2;
+  } else if (noAskRaw !== null) {
+    noPrice = noAskRaw;
+  } else if (noBidRaw !== null) {
+    noPrice = noBidRaw;
+  } else {
+    noPrice = 0;
+  }
+
+  // Export the parsed values (or 0 if null)
+  const yesBid = yesBidRaw ?? 0;
+  const yesAsk = yesAskRaw ?? 0;
+  const noBid = noBidRaw ?? 0;
+  const noAsk = noAskRaw ?? 0;
 
   return {
     ticker: m.ticker,
