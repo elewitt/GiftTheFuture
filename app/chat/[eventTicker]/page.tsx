@@ -1,8 +1,9 @@
 "use client";
 
 import { usePrivy } from "@privy-io/react-auth";
+import { useSolanaWallets } from "@privy-io/react-auth/solana";
 import { useParams } from "next/navigation";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
@@ -30,8 +31,14 @@ export default function ChatPage() {
   const params = useParams();
   const eventTicker = params.eventTicker as string;
 
-  const { ready, authenticated, user } = usePrivy();
-  const walletAddress = user?.wallet?.address;
+  const { ready, authenticated } = usePrivy();
+  const { wallets } = useSolanaWallets();
+
+  // Get the embedded Solana wallet address
+  const walletAddress = useMemo(() => {
+    const wallet = wallets.find((w) => w.walletClientType === "privy") || wallets[0];
+    return wallet?.address;
+  }, [wallets]);
 
   const [verification, setVerification] = useState<VerificationResult | null>(null);
   const [verifying, setVerifying] = useState(false);
