@@ -133,17 +133,28 @@ async function verifyPosition(
         try {
           const mints = await getOutcomeMints(market.ticker);
 
+          // Extract outcome name from ticker or title
+          let outcomeName = "YES";
+          const tickerParts = market.ticker.split("-");
+          if (tickerParts.length > 0) {
+            outcomeName = tickerParts[tickerParts.length - 1];
+          }
+          // Try to get better name from title
+          if (market.title) {
+            const titleMatch = market.title.match(/Will\s+(?:the\s+)?(.+?)\s+win/i);
+            if (titleMatch) {
+              outcomeName = titleMatch[1];
+            }
+          }
+
           const yesHolding = holdings.find(h => h.mint === mints.yesMint);
           if (yesHolding) {
-            // Extract outcome name from ticker for multi-outcome markets
-            const tickerParts = market.ticker.split("-");
-            const sideName = tickerParts.length > 3 ? tickerParts[tickerParts.length - 1] : "YES";
-            return { side: sideName, value: yesHolding.balance, ticker: market.ticker };
+            return { side: outcomeName, value: yesHolding.balance, ticker: market.ticker };
           }
 
           const noHolding = holdings.find(h => h.mint === mints.noMint);
           if (noHolding) {
-            return { side: "NO", value: noHolding.balance, ticker: market.ticker };
+            return { side: `NO ${outcomeName}`, value: noHolding.balance, ticker: market.ticker };
           }
         } catch {
           continue;

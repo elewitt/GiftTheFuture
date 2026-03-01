@@ -576,9 +576,9 @@ export default function MarketPage() {
               </div>
             </div>
 
-            {/* Chat Room Link */}
+            {/* Chat Room Link - uses eventTicker so all outcomes share one room */}
             <Link
-              href={`/chat/${ticker}`}
+              href={`/chat/${encodeURIComponent(market.eventTicker || ticker)}`}
               className="block bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-xl p-4 mb-6 hover:border-primary/40 transition group"
             >
               <div className="flex items-center justify-between">
@@ -586,10 +586,10 @@ export default function MarketPage() {
                   <span className="text-2xl">💬</span>
                   <div>
                     <p className="text-sm font-semibold text-foreground group-hover:text-primary transition">
-                      Join the Chat Room
+                      Join the Event Chat
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Token-gated discussion for position holders
+                      Discuss with all bettors on this event
                     </p>
                   </div>
                 </div>

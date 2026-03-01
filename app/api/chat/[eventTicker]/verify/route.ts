@@ -131,26 +131,41 @@ export async function GET(
             try {
               const mints = await getOutcomeMints(market.ticker);
 
-              // Check YES mint
+              // Extract outcome name from ticker or title
+              // e.g., KXNBA-26-CHAMP-SAS -> "SAS" or from title "Will the San Antonio..."
+              let outcomeName = "YES";
+              const tickerParts = market.ticker.split("-");
+              if (tickerParts.length > 0) {
+                outcomeName = tickerParts[tickerParts.length - 1];
+              }
+              // Try to get better name from title
+              if (market.title) {
+                const titleMatch = market.title.match(/Will\s+(?:the\s+)?(.+?)\s+win/i);
+                if (titleMatch) {
+                  outcomeName = titleMatch[1];
+                }
+              }
+
+              // Check YES mint (betting on this outcome)
               const yesHolding = holdings.find(h => h.mint === mints.yesMint);
               if (yesHolding) {
                 return NextResponse.json({
                   verified: true,
                   position: {
-                    side: "YES",
+                    side: outcomeName,
                     value: yesHolding.balance,
                     ticker: market.ticker,
                   },
                 });
               }
 
-              // Check NO mint
+              // Check NO mint (betting against this outcome)
               const noHolding = holdings.find(h => h.mint === mints.noMint);
               if (noHolding) {
                 return NextResponse.json({
                   verified: true,
                   position: {
-                    side: "NO",
+                    side: `NO ${outcomeName}`,
                     value: noHolding.balance,
                     ticker: market.ticker,
                   },
