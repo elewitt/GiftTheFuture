@@ -46,41 +46,67 @@ export default function ChatPage() {
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [marketTitle, setMarketTitle] = useState<string>("");
+  const [chatTitle, setChatTitle] = useState<string>("");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch market info - try the ticker, fallback to searching
+  // Generate chat room title from eventTicker
+  // This is an event-wide chat, so title should reflect all predictions (not a specific team)
   useEffect(() => {
     if (eventTicker) {
-      // First try direct market lookup
-      fetch(`/api/markets/${encodeURIComponent(eventTicker)}`)
-        .then(res => {
-          if (res.ok) return res.json();
-          // If not found, try searching for markets with this event ticker
-          return fetch(`/api/markets?q=${encodeURIComponent(eventTicker)}&limit=1`)
-            .then(r => r.json())
-            .then(data => {
-              if (data.markets?.[0]) {
-                return { market: data.markets[0] };
-              }
-              return null;
-            });
-        })
+      // Try to fetch a market to extract the event name
+      fetch(`/api/markets?q=${encodeURIComponent(eventTicker)}&limit=1`)
+        .then(r => r.json())
         .then(data => {
-          if (data?.market?.title) {
-            setMarketTitle(data.market.title);
+          if (data.markets?.[0]?.title) {
+            // Extract the event name from title like "Will X win the 2026 Pro Basketball Finals?"
+            const title = data.markets[0].title;
+            const eventMatch = title.match(/(?:the\s+)?(\d{4}\s+(?:Pro\s+)?(?:Basketball|Football|Baseball|Hockey|Soccer)?\s*(?:Finals?|Championship|Super Bowl|World Series|Stanley Cup|March Madness))/i);
+            if (eventMatch) {
+              setChatTitle(`${eventMatch[1]} Chat`);
+            } else {
+              // Fallback: create title from eventTicker
+              setChatTitle(generateEventTitle(eventTicker));
+            }
           } else {
-            // Use eventTicker as fallback title
-            setMarketTitle(eventTicker.replace(/-/g, " "));
+            setChatTitle(generateEventTitle(eventTicker));
           }
         })
         .catch(() => {
-          setMarketTitle(eventTicker.replace(/-/g, " "));
+          setChatTitle(generateEventTitle(eventTicker));
         });
     }
   }, [eventTicker]);
+
+  // Generate a friendly event title from ticker
+  function generateEventTitle(ticker: string): string {
+    const t = ticker.toUpperCase();
+
+    // NBA Finals
+    if (t.includes("NBA")) {
+      const yearMatch = t.match(/(\d{2,4})/);
+      const year = yearMatch ? (yearMatch[1].length === 2 ? `20${yearMatch[1]}` : yearMatch[1]) : "";
+      return `${year} NBA Finals Chat`;
+    }
+
+    // NFL / Super Bowl
+    if (t.includes("NFL") || t.includes("SB")) {
+      const yearMatch = t.match(/(\d{2,4})/);
+      const year = yearMatch ? (yearMatch[1].length === 2 ? `20${yearMatch[1]}` : yearMatch[1]) : "";
+      return `${year} Super Bowl Chat`;
+    }
+
+    // March Madness
+    if (t.includes("MARMAD") || t.includes("NCAA")) {
+      const yearMatch = t.match(/(\d{2,4})/);
+      const year = yearMatch ? (yearMatch[1].length === 2 ? `20${yearMatch[1]}` : yearMatch[1]) : "";
+      return `${year} March Madness Chat`;
+    }
+
+    // Fallback: clean up ticker
+    return ticker.replace(/-/g, " ").replace(/KX/gi, "").trim() + " Chat";
+  }
 
   // Verify wallet position
   const verifyPosition = useCallback(async () => {
@@ -269,32 +295,34 @@ export default function ChatPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
 
-      {/* Header */}
-      <div className="pt-20 border-b border-border bg-card/50 backdrop-blur-sm sticky top-16 z-10">
-        <div className="max-w-3xl mx-auto px-5 py-4">
-          <Link
-            href={`/market/${eventTicker}`}
-            className="text-sm text-muted-foreground hover:text-foreground transition flex items-center gap-2 mb-2"
-          >
-            <span>←</span> Back to market
-          </Link>
-          <h1 className="text-xl font-bold text-foreground">
-            {marketTitle || eventTicker}
-          </h1>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-xs text-muted-foreground">Your position:</span>
-            <span className={`text-xs font-semibold ${getPositionColor(verification.position?.side || "")}`}>
-              {verification.position?.side}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              (${verification.position?.value})
-            </span>
+      {/* Header - fixed below navbar */}
+      <div className="fixed top-16 left-0 right-0 border-b border-border bg-card/95 backdrop-blur-sm z-10">
+        <div className="max-w-3xl mx-auto px-5 py-3">
+          <div className="flex items-center justify-between">
+            <Link
+              href={`/market/${eventTicker}`}
+              className="text-sm text-muted-foreground hover:text-foreground transition flex items-center gap-1"
+            >
+              <span>←</span> Back
+            </Link>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Your pick:</span>
+              <span className={`text-xs font-semibold ${getPositionColor(verification.position?.side || "")}`}>
+                {verification.position?.side}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                (${verification.position?.value})
+              </span>
+            </div>
           </div>
+          <h1 className="text-lg font-bold text-foreground mt-2">
+            {chatTitle || eventTicker}
+          </h1>
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Messages - add padding for fixed header */}
+      <div className="flex-1 overflow-y-auto pt-28">
         <div className="max-w-3xl mx-auto px-5 py-4">
           {messages.length === 0 ? (
             <div className="text-center py-12">
