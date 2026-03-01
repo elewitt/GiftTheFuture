@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { getPositions, Position } from "@/lib/solana";
-import { getOutcomeMints, getMarket } from "@/lib/dflow";
 import { PublicKey } from "@solana/web3.js";
 
-const MINIMUM_POSITION_VALUE = 1; // $1 minimum (for testing)
+// No minimum - just need to hold any tokens
 
 interface VerificationResult {
   verified: boolean;
@@ -103,72 +102,17 @@ export async function GET(
       });
     }
 
-    // Get current prices for value calculation
-    for (const position of matchingPositions) {
-      if (!position.market) continue;
-
-      try {
-        const market = await getMarket(position.market.ticker);
-        // Price is stored as 0-1, balance is in tokens (1 token = $1 if wins)
-        // Current value = balance * current price
-        const price = position.side === "YES"
-          ? (market.yes_price ?? 0.5)
-          : (market.no_price ?? 0.5);
-
-        const positionValue = position.balance * price;
-
-        if (positionValue >= MINIMUM_POSITION_VALUE) {
-          return NextResponse.json({
-            verified: true,
-            position: {
-              side: position.side,
-              value: Math.round(positionValue * 100) / 100,
-              ticker: position.market.ticker,
-            },
-          });
-        }
-      } catch (err) {
-        console.error(`Failed to get price for ${position.market.ticker}:`, err);
-        // Continue checking other positions
-      }
-    }
-
-    // Check total value across all matching positions
-    let totalValue = 0;
-    let largestPosition = matchingPositions[0];
-
-    for (const position of matchingPositions) {
-      if (!position.market) continue;
-      try {
-        const market = await getMarket(position.market.ticker);
-        const price = position.side === "YES"
-          ? (market.yes_price ?? 0.5)
-          : (market.no_price ?? 0.5);
-        const value = position.balance * price;
-        totalValue += value;
-
-        if (value > (largestPosition.balance * 0.5)) {
-          largestPosition = position;
-        }
-      } catch {
-        // Skip position if can't get price
-      }
-    }
-
-    if (totalValue >= MINIMUM_POSITION_VALUE) {
-      return NextResponse.json({
-        verified: true,
-        position: {
-          side: largestPosition.side,
-          value: Math.round(totalValue * 100) / 100,
-          ticker: largestPosition.market?.ticker || eventTicker,
-        },
-      });
-    }
+    // User has matching positions - they're verified!
+    // Use the first/largest position for display
+    const position = matchingPositions[0];
 
     return NextResponse.json({
-      verified: false,
-      error: `Position value ($${totalValue.toFixed(2)}) is below minimum ($${MINIMUM_POSITION_VALUE})`
+      verified: true,
+      position: {
+        side: position.side,
+        value: position.balance, // Just show token count
+        ticker: position.market?.ticker || eventTicker,
+      },
     });
 
   } catch (error: any) {

@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getPositions } from "@/lib/solana";
-import { getMarket } from "@/lib/dflow";
 import crypto from "crypto";
 
-const MINIMUM_POSITION_VALUE = 1; // $1 minimum (for testing)
+// No minimum - just need to hold any tokens
 const MAX_MESSAGES = 100;
 
 interface ChatMessageResponse {
@@ -109,38 +108,27 @@ export async function POST(
 
       if (!matches) continue;
 
-      try {
-        const market = await getMarket(position.market.ticker);
-        const price = position.side === "YES"
-          ? (market.yes_price ?? 0.5)
-          : (market.no_price ?? 0.5);
-        const value = position.balance * price;
-
-        if (value >= MINIMUM_POSITION_VALUE) {
-          // For multi-outcome markets, extract the outcome name from ticker
-          // e.g., KXNBA-MVP-2025-SGIL -> SGIL (Shai Gilgeous-Alexander)
-          let sideName: string = position.side;
-          const tickerParts = position.market.ticker.split("-");
-          if (tickerParts.length > 3) {
-            // Use the last part as the outcome identifier
-            sideName = tickerParts[tickerParts.length - 1];
-          }
-
-          verifiedPosition = {
-            side: sideName,
-            value: Math.round(value * 100) / 100,
-            ticker: position.market.ticker,
-          };
-          break;
-        }
-      } catch {
-        continue;
+      // Found a matching position - user is verified
+      // For multi-outcome markets, extract the outcome name from ticker
+      // e.g., KXNBA-MVP-2025-SGIL -> SGIL (Shai Gilgeous-Alexander)
+      let sideName: string = position.side;
+      const tickerParts = position.market.ticker.split("-");
+      if (tickerParts.length > 3) {
+        // Use the last part as the outcome identifier
+        sideName = tickerParts[tickerParts.length - 1];
       }
+
+      verifiedPosition = {
+        side: sideName,
+        value: position.balance, // Just show token count
+        ticker: position.market.ticker,
+      };
+      break;
     }
 
     if (!verifiedPosition) {
       return NextResponse.json({
-        error: `You need at least $${MINIMUM_POSITION_VALUE} position to chat`
+        error: "You need to hold tokens in this market to chat"
       }, { status: 403 });
     }
 
