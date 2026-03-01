@@ -9,6 +9,15 @@ import crypto from "crypto";
 const MAX_MESSAGES = 100;
 const DFLOW_API = process.env.DFLOW_METADATA_API || "https://d.prediction-markets-api.dflow.net";
 
+function getDFlowHeaders(): HeadersInit {
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  const apiKey = process.env.DFLOW_API_KEY;
+  if (apiKey) {
+    headers["x-api-key"] = apiKey;
+  }
+  return headers;
+}
+
 interface ChatMessageResponse {
   id: string;
   content: string;
@@ -114,7 +123,7 @@ async function verifyPosition(
   // Search for matching markets
   try {
     const res = await fetch(`${DFLOW_API}/api/v1/markets?status=active&limit=200`, {
-      headers: { "Content-Type": "application/json" },
+      headers: getDFlowHeaders(),
     });
 
     if (res.ok) {

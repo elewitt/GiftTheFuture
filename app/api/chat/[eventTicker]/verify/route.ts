@@ -6,6 +6,15 @@ import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 
 const DFLOW_API = process.env.DFLOW_METADATA_API || "https://d.prediction-markets-api.dflow.net";
 
+function getDFlowHeaders(): HeadersInit {
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  const apiKey = process.env.DFLOW_API_KEY;
+  if (apiKey) {
+    headers["x-api-key"] = apiKey;
+  }
+  return headers;
+}
+
 interface VerificationResult {
   verified: boolean;
   position?: {
@@ -88,7 +97,7 @@ export async function GET(
     let markets: any[] = [];
     try {
       const res = await fetch(`${DFLOW_API}/api/v1/markets?status=active&limit=500`, {
-        headers: { "Content-Type": "application/json" },
+        headers: getDFlowHeaders(),
       });
       if (res.ok) {
         const data = await res.json();
