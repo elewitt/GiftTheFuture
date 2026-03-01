@@ -274,7 +274,7 @@ export default function ChannelsPage() {
               Prediction Channels
             </h1>
             <p className="text-muted-foreground max-w-xl mx-auto">
-              Join token-gated chat rooms with other predictors. Hold any position in a market to unlock its channel.
+              Browse chat rooms for prediction markets. Anyone can view, but you need to hold a position to participate.
             </p>
           </div>
 
@@ -361,63 +361,59 @@ export default function ChannelsPage() {
                     </div>
 
                     <div className="mt-4">
-                      {!ready || !authenticated ? (
-                        <p className="text-xs text-muted-foreground text-center py-2">
-                          Sign in to check access
-                        </p>
-                      ) : status?.verified ? (
-                        <Link href={`/chat/${encodeURIComponent(channel.eventTicker)}`}>
-                          <Button className="w-full" size="sm">
-                            <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                            </svg>
-                            Enter Chat
-                          </Button>
-                        </Link>
-                      ) : status && !status.verified ? (
-                        <div className="text-center">
-                          <p className="text-xs text-muted-foreground mb-2">
-                            No position detected
-                          </p>
-                          <Link href={`/market/${encodeURIComponent(channel.eventTicker)}`}>
-                            <Button variant="outline" size="sm" className="w-full">
-                              Get a Position
-                            </Button>
-                          </Link>
-                        </div>
-                      ) : (
+                      <Link href={`/chat/${encodeURIComponent(channel.eventTicker)}`}>
                         <Button
-                          variant="outline"
-                          size="sm"
                           className="w-full"
-                          onClick={() => verifyChannel(channel.eventTicker)}
-                          disabled={isVerifying}
+                          size="sm"
+                          variant={status?.verified ? "default" : "outline"}
                         >
-                          {isVerifying ? (
+                          {status?.verified ? (
                             <>
-                              <span className="w-4 h-4 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin mr-2" />
-                              Checking...
+                              <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                              </svg>
+                              Enter Chat
                             </>
                           ) : (
                             <>
                               <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                               </svg>
-                              Check Access
+                              View Chat
                             </>
                           )}
                         </Button>
-                      )}
+                      </Link>
                     </div>
 
-                    {status?.verified && status.position && (
+                    {status?.verified && status.position ? (
                       <div className="mt-3 pt-3 border-t border-border">
                         <p className="text-xs text-muted-foreground">
                           Your position: <span className="text-primary font-medium">{status.position.side}</span>
                           {" "}(${status.position.value})
                         </p>
                       </div>
-                    )}
+                    ) : ready && authenticated && !status && !isVerifying ? (
+                      <div className="mt-3 pt-3 border-t border-border">
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            verifyChannel(channel.eventTicker);
+                          }}
+                          className="text-xs text-muted-foreground hover:text-primary transition"
+                        >
+                          Check if you have access →
+                        </button>
+                      </div>
+                    ) : isVerifying ? (
+                      <div className="mt-3 pt-3 border-t border-border">
+                        <p className="text-xs text-muted-foreground flex items-center gap-2">
+                          <span className="w-3 h-3 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
+                          Checking access...
+                        </p>
+                      </div>
+                    ) : null}
                   </motion.div>
                 );
               })}
