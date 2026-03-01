@@ -46,28 +46,32 @@ export default function ChannelsPage() {
       try {
         // Use same query pattern as front page MarketsSection
         const url = selectedCategory
-          ? `/api/markets?category=${selectedCategory}&limit=30`
-          : "/api/markets?trending=true&limit=30";
+          ? `/api/markets?category=${selectedCategory}&limit=50`
+          : "/api/markets?trending=true&limit=50";
 
         const res = await fetch(url, { cache: "no-store" });
         const data = await res.json();
 
         if (data.markets) {
-          // Group markets by eventTicker to create channels
+          // Group markets by normalized channel title to avoid duplicates
           const channelMap = new Map<string, Channel>();
 
           for (const market of data.markets) {
             const eventTicker = market.eventTicker || market.ticker;
+            const title = generateChannelTitle(eventTicker, market.title);
 
-            if (!channelMap.has(eventTicker)) {
-              channelMap.set(eventTicker, {
+            // Use normalized title as key to deduplicate (e.g., all "2026 NBA Finals" together)
+            const normalizedKey = title.toLowerCase().trim();
+
+            if (!channelMap.has(normalizedKey)) {
+              channelMap.set(normalizedKey, {
                 eventTicker,
-                title: generateChannelTitle(eventTicker, market.title),
+                title,
                 category: market.category || "Other",
                 marketCount: 1,
               });
             } else {
-              const existing = channelMap.get(eventTicker)!;
+              const existing = channelMap.get(normalizedKey)!;
               existing.marketCount++;
             }
           }
@@ -87,37 +91,68 @@ export default function ChannelsPage() {
   // Generate a friendly channel title
   function generateChannelTitle(ticker: string, marketTitle: string): string {
     const t = ticker.toUpperCase();
+    const title = marketTitle || "";
 
-    // Try to extract event name from market title
-    const eventMatch = marketTitle?.match(
-      /(?:the\s+)?(\d{4}\s+(?:Pro\s+)?(?:Basketball|Football|Baseball|Hockey|Soccer)?\s*(?:Finals?|Championship|Super Bowl|World Series|Stanley Cup|March Madness))/i
-    );
-    if (eventMatch) {
-      return eventMatch[1];
+    // Check for single game matchups first (e.g., "Team A vs Team B" or "Team A at Team B")
+    const matchupPattern = /(.+?)\s+(?:vs\.?|at|@)\s+(.+?)(?:\s+[-–]\s+|\s*\?|$)/i;
+    const matchupMatch = title.match(matchupPattern);
+    if (matchupMatch) {
+      const team1 = matchupMatch[1].replace(/^Will\s+/i, "").trim();
+      const team2 = matchupMatch[2].replace(/\s+win.*$/i, "").trim();
+      // Only use matchup if both teams look like team names (not too long)
+      if (team1.length < 30 && team2.length < 30 && !team1.includes("Finals") && !team2.includes("Finals")) {
+        return `${team1} vs ${team2}`;
+      }
     }
 
-    // NBA Finals
-    if (t.includes("NBA")) {
+    // Check for "Who will win" pattern with event name
+    const winnerMatch = title.match(/Who will win (?:the\s+)?(.+?)(?:\?|$)/i);
+    if (winnerMatch) {
+      return winnerMatch[1].trim();
+    }
+
+    // Extract championship/finals event name
+    const eventMatch = title.match(
+      /(?:the\s+)?(\d{4}\s+(?:Pro\s+)?(?:Basketball|Football|Baseball|Hockey|Soccer|NFL|NBA|MLB|NHL)?\s*(?:Finals?|Championship|Super Bowl|World Series|Stanley Cup|March Madness|Playoffs?))/i
+    );
+    if (eventMatch) {
+      return eventMatch[1].trim();
+    }
+
+    // NBA Finals - extract year from ticker
+    if (t.includes("NBA") && (t.includes("CHAMP") || title.toLowerCase().includes("finals"))) {
       const yearMatch = t.match(/(\d{2,4})/);
-      const year = yearMatch ? (yearMatch[1].length === 2 ? `20${yearMatch[1]}` : yearMatch[1]) : "";
+      const year = yearMatch ? (yearMatch[1].length === 2 ? `20${yearMatch[1]}` : yearMatch[1]) : "2026";
       return `${year} NBA Finals`;
     }
 
     // NFL / Super Bowl
-    if (t.includes("NFL") || t.includes("SB")) {
+    if (t.includes("NFL") || t.includes("SB") || title.toLowerCase().includes("super bowl")) {
       const yearMatch = t.match(/(\d{2,4})/);
       const year = yearMatch ? (yearMatch[1].length === 2 ? `20${yearMatch[1]}` : yearMatch[1]) : "";
-      return `${year} Super Bowl`;
+      return `${year} Super Bowl`.trim();
     }
 
     // March Madness
-    if (t.includes("MARMAD") || t.includes("NCAA")) {
+    if (t.includes("MARMAD") || t.includes("NCAA") || title.toLowerCase().includes("march madness")) {
       const yearMatch = t.match(/(\d{2,4})/);
       const year = yearMatch ? (yearMatch[1].length === 2 ? `20${yearMatch[1]}` : yearMatch[1]) : "";
-      return `${year} March Madness`;
+      return `${year} March Madness`.trim();
     }
 
-    // Clean up ticker as fallback
+    // For other markets, try to extract a clean title
+    // Remove "Will X win" prefix and clean up
+    const cleanTitle = title
+      .replace(/^Will\s+(?:the\s+)?/i, "")
+      .replace(/\s+win.*$/i, "")
+      .replace(/\?$/, "")
+      .trim();
+
+    if (cleanTitle && cleanTitle.length < 50) {
+      return cleanTitle;
+    }
+
+    // Final fallback: clean up ticker
     return ticker.replace(/-/g, " ").replace(/KX/gi, "").trim();
   }
 
