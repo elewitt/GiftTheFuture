@@ -152,11 +152,11 @@ function getOutcomeLabel(outcome: MarketDetail, allOutcomes: MarketDetail[]): st
 
     // Try to extract name from common patterns
     const namePatterns = [
-      /^Will\s+(.+?)\s+win/i,           // "Will Shai Gilgeous-Alexander win MVP?"
-      /^Will\s+(.+?)\s+be\s+/i,         // "Will X be nominated?"
-      /nominate\s+(.+?)\s+as/i,         // "nominate Kevin Warsh as Fed Chair"
-      /^(.+?)\s+to\s+win/i,             // "Lakers to win championship"
-      /^(.+?)\s+wins?\s/i,              // "Lakers wins..."
+      /^Will\s+(?:the\s+)?(.+?)\s+win/i,  // "Will the Oklahoma City win..." or "Will Shai win..."
+      /^Will\s+(?:the\s+)?(.+?)\s+be\s+/i, // "Will X be nominated?"
+      /nominate\s+(?:the\s+)?(.+?)\s+as/i, // "nominate Kevin Warsh as Fed Chair"
+      /^(?:The\s+)?(.+?)\s+to\s+win/i,     // "The Lakers to win championship"
+      /^(?:The\s+)?(.+?)\s+wins?\s/i,      // "The Lakers wins..."
     ];
 
     for (const pattern of namePatterns) {
