@@ -123,6 +123,17 @@ export function KYCVerification({ onVerified, onClose, showAsModal = true }: KYC
     }
   }
 
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const copyWalletAddress = () => {
+    if (walletAddress) {
+      navigator.clipboard.writeText(walletAddress);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   const content = (
     <div className="text-center">
       <div className="text-5xl mb-4">🔐</div>
@@ -130,8 +141,7 @@ export function KYCVerification({ onVerified, onClose, showAsModal = true }: KYC
         Identity Verification Required
       </h2>
       <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
-        To trade prediction markets, you need to complete a one-time identity verification.
-        This takes about 2 minutes.
+        To purchase prediction market gifts, you need to complete a one-time identity verification.
       </p>
 
       {error && (
@@ -140,29 +150,99 @@ export function KYCVerification({ onVerified, onClose, showAsModal = true }: KYC
         </div>
       )}
 
-      <Button
-        onClick={handleStartVerification}
-        disabled={isGeneratingLink}
-        size="lg"
-        className="w-full max-w-xs"
-      >
-        {isGeneratingLink ? (
-          <span className="flex items-center gap-2">
-            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            Preparing...
-          </span>
-        ) : (
-          "Verify Identity"
-        )}
-      </Button>
+      {!showInstructions ? (
+        <>
+          <Button
+            onClick={() => setShowInstructions(true)}
+            size="lg"
+            className="w-full max-w-xs"
+          >
+            Verify Identity
+          </Button>
 
-      {onClose && (
-        <button
-          onClick={onClose}
-          className="block w-full text-sm text-muted-foreground hover:text-foreground mt-4 transition"
-        >
-          Maybe Later
-        </button>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="block w-full text-sm text-muted-foreground hover:text-foreground mt-4 transition"
+            >
+              Maybe Later
+            </button>
+          )}
+        </>
+      ) : (
+        <div className="text-left bg-secondary/50 rounded-xl p-4 max-w-sm mx-auto">
+          <h3 className="font-semibold text-foreground mb-3">Verification Steps:</h3>
+
+          <div className="space-y-4 text-sm">
+            <div className="flex gap-3">
+              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">1</span>
+              <div>
+                <p className="text-foreground font-medium">Copy your wallet address</p>
+                <button
+                  onClick={copyWalletAddress}
+                  className="mt-1 px-3 py-1.5 bg-secondary rounded-lg text-xs font-mono text-muted-foreground hover:text-foreground transition flex items-center gap-2"
+                >
+                  {walletAddress ? `${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}` : "Loading..."}
+                  <span>{copied ? "✓" : "📋"}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">2</span>
+              <div>
+                <p className="text-foreground font-medium">Go to DFlow Proof</p>
+                <a
+                  href="https://dflow.net/proof"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 inline-block px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 transition"
+                >
+                  Open DFlow Proof →
+                </a>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">3</span>
+              <div>
+                <p className="text-foreground font-medium">Connect & verify</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Import your wallet into Phantom using "Export Wallet" from the menu, then connect to DFlow Proof
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">4</span>
+              <div>
+                <p className="text-foreground font-medium">Complete ID verification</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Upload your ID and take a selfie (~2 min)
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-border">
+            <button
+              onClick={() => {
+                setShowInstructions(false);
+                checkKYCStatus();
+                onVerified?.();
+              }}
+              className="w-full py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition"
+            >
+              I've completed verification
+            </button>
+            <button
+              onClick={() => setShowInstructions(false)}
+              className="block w-full text-sm text-muted-foreground hover:text-foreground mt-2 transition"
+            >
+              Go back
+            </button>
+          </div>
+        </div>
       )}
 
       <p className="text-[10px] text-muted-foreground mt-4">
