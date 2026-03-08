@@ -18,6 +18,7 @@ interface GiftData {
   recipientName: string;
   giftMessage: string;
   status: string;
+  senderPrivyId?: string;
 }
 
 type ClaimStep =
@@ -29,6 +30,7 @@ type ClaimStep =
   | "claiming"      // Transferring on-chain
   | "claimed"       // Success!
   | "already_claimed"
+  | "sender_warning" // Sender is trying to claim their own gift
   | "error"
   | "not_found";
 
@@ -36,7 +38,7 @@ export default function GiftClaimPage() {
   const params = useParams();
   const giftId = params.id as string;
 
-  const { ready, authenticated, user } = usePrivy();
+  const { ready, authenticated, user, logout } = usePrivy();
   const { wallets } = useSolanaWallets();
   const { createWallet } = useCreateWallet();
 
@@ -80,7 +82,14 @@ export default function GiftClaimPage() {
   useEffect(() => {
     if (!authenticated || !gift || !ready) return;
     if (gift.status !== "pending_claim") return;
-    if (step === "claiming" || step === "claimed" || step === "error") return;
+    if (step === "claiming" || step === "claimed" || step === "error" || step === "sender_warning") return;
+
+    // Check if the current user is the sender - prevent them from claiming their own gift
+    if (gift.senderPrivyId && user?.id && gift.senderPrivyId === user.id) {
+      console.log("[Claim] Sender attempting to claim their own gift");
+      setStep("sender_warning");
+      return;
+    }
 
     // Try multiple ways to find the Solana wallet address
     let walletAddress: string | undefined;
@@ -250,6 +259,50 @@ export default function GiftClaimPage() {
           <Link href="/dashboard">
             <Button>View Dashboard</Button>
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Sender warning (trying to claim own gift) ────────────
+  if (step === "sender_warning") {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-5 bg-background">
+        <div className="text-center max-w-sm">
+          <div className="w-20 h-20 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center mx-auto mb-6">
+            <span className="text-4xl">👋</span>
+          </div>
+          <h1 className="text-xl font-bold mb-2 text-foreground">This is your gift!</h1>
+          <p className="text-sm text-muted-foreground mb-2">
+            You sent this gift to someone else. To test the claim flow, sign out and use a different account.
+          </p>
+          <p className="text-xs text-muted-foreground mb-6">
+            Share this link with your recipient so they can claim it.
+          </p>
+          <div className="flex flex-col gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href);
+              }}
+            >
+              Copy Gift Link
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                logout();
+                setStep("opened");
+              }}
+            >
+              Sign Out & Test as Recipient
+            </Button>
+            <Link href="/dashboard">
+              <Button variant="ghost" className="w-full">
+                ← Back to Dashboard
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     );

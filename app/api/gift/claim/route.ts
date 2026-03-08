@@ -127,7 +127,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Gift not found" }, { status: 404 });
   }
 
-  // Return public-safe gift info (no sender privy ID, no wallet keys)
+  // Return public-safe gift info
   // Convert raw token amount to human-readable (DFlow tokens have 6 decimals)
   const TOKEN_DECIMALS = 6;
   const displayTokenAmount = gift.tokenAmount / Math.pow(10, TOKEN_DECIMALS);
@@ -141,6 +141,7 @@ export async function GET(req: Request) {
     rawTokenAmount: gift.tokenAmount, // Raw amount for reference
     costUSDC: gift.costUSDC,
     senderName: "Someone", // Don't expose sender details publicly
+    senderPrivyId: gift.senderPrivyId, // Used to prevent sender from claiming their own gift
     recipientName: gift.recipientName,
     giftMessage: gift.giftMessage,
     status: gift.status,
