@@ -88,4 +88,12 @@
   .glow-accent {
     box-shadow: 0 0 30px -5px hsl(43 96% 56% / 0.3);
   }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
