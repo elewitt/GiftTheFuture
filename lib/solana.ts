@@ -25,7 +25,7 @@ import {
   TOKEN_2022_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { getMarketByMint } from "./dflow";
+import { getMarketInfoByMint } from "./dflow";
 import bs58 from "bs58";
 
 // ─── Connection ──────────────────────────────────────────────
@@ -350,32 +350,26 @@ export async function getPositions(
   // Cross-reference with DFlow to find prediction market tokens
   const positions: Position[] = [];
 
-  for (const holding of holdings) {
-    const market = await getMarketByMint(holding.mint);
+  // Use Promise.all for parallel lookups (much faster)
+  const lookupResults = await Promise.all(
+    holdings.map(async (holding) => {
+      const info = await getMarketInfoByMint(holding.mint);
+      return { holding, info };
+    })
+  );
 
-    if (market) {
-      // Find which side (YES/NO) this mint represents
-      let side: "YES" | "NO" | "UNKNOWN" = "UNKNOWN";
-      for (const collateral of Object.values(market.accounts)) {
-        if (holding.mint === collateral.yesMint) {
-          side = "YES";
-          break;
-        } else if (holding.mint === collateral.noMint) {
-          side = "NO";
-          break;
-        }
-      }
-
+  for (const { holding, info } of lookupResults) {
+    if (info) {
       positions.push({
         mint: holding.mint,
         balance: holding.balance,
         decimals: holding.decimals,
         market: {
-          ticker: market.ticker,
-          title: market.title,
-          status: market.status,
+          ticker: info.market.ticker,
+          title: info.market.title,
+          status: info.market.status,
         },
-        side,
+        side: info.side,
       });
     }
   }

@@ -15,23 +15,26 @@ export function Navbar() {
         <Link href="/" className="flex items-center gap-3">
           <Image
             src="/logo.png"
-            alt="Gift the Future"
+            alt="Future Markets"
             width={40}
             height={40}
             className="rounded-lg"
           />
           <span className="text-xl font-bold tracking-tight text-foreground">
-            Gift the <span className="text-gradient-brand">Future</span>
+            Future <span className="text-gradient-brand">Markets</span>
           </span>
         </Link>
 
         <div className="hidden items-center gap-6 md:flex">
-          <a
-            href="/#how-it-works"
-            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          <Link
+            href="/feed"
+            className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
-            How it Works
-          </a>
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+            </svg>
+            Feed
+          </Link>
           <a
             href="/#markets"
             className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -49,9 +52,9 @@ export function Navbar() {
           </Link>
           <Link href="/dashboard" className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
-            My Gifts
+            Portfolio
           </Link>
           {ready && (
             authenticated ? (

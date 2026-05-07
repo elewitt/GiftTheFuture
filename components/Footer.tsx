@@ -10,17 +10,17 @@ export function Footer() {
         <div className="flex items-center gap-3">
           <Image
             src="/logo.png"
-            alt="Gift the Future"
+            alt="Future Markets"
             width={32}
             height={32}
             className="rounded-lg"
           />
           <span className="text-sm font-semibold text-foreground">
-            Gift the Future
+            Future Markets
           </span>
         </div>
         <p className="text-sm text-muted-foreground">
-          © {new Date().getFullYear()} Gift the Future. Powered by Kalshi.
+          © {new Date().getFullYear()} Future Markets. Powered by Kalshi.
         </p>
       </div>
     </footer>

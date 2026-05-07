@@ -21,10 +21,10 @@ export function CTASection() {
 
           <div className="relative px-8 py-16 md:px-16 md:py-20 text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Ready to gift the future?
+              Ready to own the future?
             </h2>
             <p className="text-muted-foreground max-w-xl mx-auto mb-8">
-              Browse trending prediction markets and send someone a unique, meaningful gift that could pay out big.
+              Browse trending prediction markets and buy positions that could pay out big.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="#markets">

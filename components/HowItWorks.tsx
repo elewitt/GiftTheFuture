@@ -14,18 +14,18 @@ const steps = [
     ),
   },
   {
-    title: "Send as a Gift",
-    description: "Buy a Yes or No position and gift it to anyone via email or link. No account needed to receive.",
+    title: "Buy Your Position",
+    description: "Choose Yes or No and pay with your card. Tokens go directly to your wallet.",
     accent: "accent",
     icon: (
       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
       </svg>
     ),
   },
   {
-    title: "They Win (or Cash Out!)",
-    description: "If the prediction is right, your friend gets paid out. Or they can cash out anytime at market price.",
+    title: "Win or Cash Out",
+    description: "If your prediction is right, you get paid out $1 per share. Or cash out anytime at market price.",
     accent: "primary",
     icon: (
       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -54,7 +54,7 @@ export function HowItWorks() {
             How it Works
           </span>
           <h2 className="text-3xl font-bold tracking-tight md:text-4xl">
-            Gift a prediction in <span className="text-gradient-brand">three easy steps</span>
+            Start trading in <span className="text-gradient-brand">three easy steps</span>
           </h2>
         </motion.div>
 

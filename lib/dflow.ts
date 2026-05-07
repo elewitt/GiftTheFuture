@@ -123,21 +123,95 @@ export async function getMarket(ticker: string): Promise<DFlowMarket> {
 /**
  * Look up a market by its SPL token mint address.
  * Useful for identifying what market a token in someone's wallet belongs to.
+ *
+ * Since DFlow's by-mint API may return 403, we build a local cache from
+ * active events/markets data.
  */
+
+// Cache mint -> market mappings
+let mintToMarketCache: Map<string, { market: DFlowMarket; side: "YES" | "NO" }> | null = null;
+let cacheExpiry = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function buildMintCache(): Promise<Map<string, { market: DFlowMarket; side: "YES" | "NO" }>> {
+  const cache = new Map<string, { market: DFlowMarket; side: "YES" | "NO" }>();
+
+  try {
+    // Fetch all active events with nested markets
+    const events = await getActiveEvents(200, "active");
+
+    for (const event of events) {
+      if (!event.markets) continue;
+
+      for (const market of event.markets) {
+        if (!market.accounts) continue;
+
+        // Process accounts for each collateral type
+        for (const accounts of Object.values(market.accounts)) {
+          if (accounts.yesMint) {
+            cache.set(accounts.yesMint, { market, side: "YES" });
+          }
+          if (accounts.noMint) {
+            cache.set(accounts.noMint, { market, side: "NO" });
+          }
+        }
+      }
+    }
+
+    // Also fetch finalized markets for recently resolved positions
+    try {
+      const finalizedEvents = await getActiveEvents(50, "finalized");
+      for (const event of finalizedEvents) {
+        if (!event.markets) continue;
+        for (const market of event.markets) {
+          if (!market.accounts) continue;
+          for (const accounts of Object.values(market.accounts)) {
+            if (accounts.yesMint && !cache.has(accounts.yesMint)) {
+              cache.set(accounts.yesMint, { market, side: "YES" });
+            }
+            if (accounts.noMint && !cache.has(accounts.noMint)) {
+              cache.set(accounts.noMint, { market, side: "NO" });
+            }
+          }
+        }
+      }
+    } catch {
+      // Ignore errors fetching finalized - active is sufficient
+    }
+  } catch (err) {
+    console.error("[DFlow] Failed to build mint cache:", err);
+  }
+
+  return cache;
+}
+
 export async function getMarketByMint(
   mintAddress: string
 ): Promise<DFlowMarket | null> {
-  try {
-    const res = await fetch(
-      `${METADATA_API}/api/v1/markets/by-mint/${mintAddress}`,
-      { headers: headers() }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.market;
-  } catch {
-    return null;
+  // Use cached data
+  if (!mintToMarketCache || Date.now() > cacheExpiry) {
+    mintToMarketCache = await buildMintCache();
+    cacheExpiry = Date.now() + CACHE_TTL;
+    console.log(`[DFlow] Mint cache built with ${mintToMarketCache.size} entries`);
   }
+
+  const entry = mintToMarketCache.get(mintAddress);
+  return entry?.market || null;
+}
+
+/**
+ * Get market and side info for a mint address.
+ */
+export async function getMarketInfoByMint(
+  mintAddress: string
+): Promise<{ market: DFlowMarket; side: "YES" | "NO" } | null> {
+  if (!mintToMarketCache || Date.now() > cacheExpiry) {
+    mintToMarketCache = await buildMintCache();
+    cacheExpiry = Date.now() + CACHE_TTL;
+    console.log(`[DFlow] Mint cache built with ${mintToMarketCache.size} entries`);
+  }
+
+  return mintToMarketCache.get(mintAddress) || null;
 }
 
 /**

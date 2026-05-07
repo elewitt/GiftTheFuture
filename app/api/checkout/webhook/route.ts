@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createGift, updateGift } from "@/lib/gifts";
 import { createOrder, getOutcomeMints, USDC_MINT } from "@/lib/dflow";
-import { signAndSendDFlowTransaction, confirmTransaction, getServerKeypair } from "@/lib/solana";
+import { signAndSendDFlowTransaction, confirmTransaction, getServerKeypair, transferOutcomeTokens } from "@/lib/solana";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-02-24.acacia",
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
 
 async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
   const metadata = session.metadata || {};
-  
+
   const {
     marketTicker,
     marketTitle,
@@ -87,13 +87,19 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
     giftMessage,
     senderEmail,
     senderPrivyId,
+    isSelfPurchase,
+    userWalletAddress,
   } = metadata;
 
-  console.log("[Webhook] Processing gift purchase:", {
+  const selfPurchase = isSelfPurchase === "true";
+
+  console.log("[Webhook] Processing purchase:", {
     marketTicker,
     side,
     shares,
     recipientEmail,
+    selfPurchase,
+    userWalletAddress: selfPurchase ? userWalletAddress : "(gift mode)",
     demoMode: isDemoMode,
   });
 
@@ -220,71 +226,100 @@ async function handleSuccessfulPayment(session: Stripe.Checkout.Session) {
       }
     }
 
-    // Create gift record
-    const gift = await createGift({
-      marketTicker,
-      marketTitle: marketTitle || marketTicker,
-      side: side as "yes" | "no",
-      outcomeMint: outputMint,
-      tokenAmount: tokensReceived,
-      costUSDC: parseFloat(shares) * parseFloat(pricePerShare),
-      senderPrivyId: senderPrivyId || senderEmail || "stripe-" + session.id,
-      recipientName: recipientName || "",
-      recipientContact: recipientEmail,
-      giftMessage: giftMessage || "",
-    });
+    // Handle self-purchase vs gift mode
+    if (selfPurchase && userWalletAddress) {
+      // ─── SELF-PURCHASE: Transfer tokens directly to user's wallet ───
+      console.log("[Webhook] Self-purchase mode - transferring tokens to:", userWalletAddress);
 
-    // Update to pending_claim
-    await updateGift(gift.id, {
-      status: "pending_claim",
-      purchaseTxSig,
-      tokenAmount: tokensReceived,
-    });
-
-    // Send claim email
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
-    const claimUrl = `${appUrl}/gift/${gift.id}`;
-    console.log("[Webhook] Sending claim email to:", recipientEmail);
-    console.log("[Webhook] Claim URL:", claimUrl);
-    console.log("[Webhook] RESEND_FROM_EMAIL:", process.env.RESEND_FROM_EMAIL || "(not set - using test domain)");
-
-    // Use the request origin for internal API calls, or fall back to appUrl
-    const apiBase = appUrl;
-
-    try {
-      console.log("[Webhook] Calling email API at:", `${apiBase}/api/email/send`);
-      // For email, use display amount (human-readable shares)
-      const displayShares = tokensReceived / Math.pow(10, TOKEN_DECIMALS);
-      const emailRes = await fetch(`${apiBase}/api/email/send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: recipientEmail,
-          recipientName,
-          senderName: senderEmail?.split("@")[0] || "A friend",
-          marketTitle,
-          side,
-          shares: displayShares,
-          giftMessage,
-          claimUrl,
-        }),
-      });
-      
-      if (!emailRes.ok) {
-        const errData = await emailRes.json().catch(() => ({}));
-        console.error("[Webhook] Email API error:", errData);
+      if (!isDemoMode) {
+        try {
+          const transferSig = await transferOutcomeTokens({
+            outcomeMint: outputMint,
+            recipientAddress: userWalletAddress,
+            amount: tokensReceived,
+          });
+          console.log("[Webhook] ✅ Tokens transferred to user wallet:", transferSig);
+        } catch (transferErr: any) {
+          console.error("[Webhook] ❌ Token transfer failed:", transferErr.message);
+          // Tokens are still in server wallet - user can contact support
+        }
       } else {
-        console.log("[Webhook] Claim email sent to:", recipientEmail);
+        console.log("[Webhook] ⚠️ DEMO MODE - Skipping actual token transfer");
       }
-    } catch (emailErr) {
-      console.error("[Webhook] Email send failed:", emailErr);
-    }
 
-    console.log("[Webhook] Gift created successfully:", {
-      giftId: gift.id,
-      claimUrl,
-      demoMode: isDemoMode,
-    });
+      console.log("[Webhook] Self-purchase completed:", {
+        marketTicker,
+        side,
+        tokensReceived: tokensReceived / Math.pow(10, TOKEN_DECIMALS),
+        userWallet: userWalletAddress,
+      });
+    } else {
+      // ─── GIFT MODE: Create gift record and send email ───
+      const gift = await createGift({
+        marketTicker,
+        marketTitle: marketTitle || marketTicker,
+        side: side as "yes" | "no",
+        outcomeMint: outputMint,
+        tokenAmount: tokensReceived,
+        costUSDC: parseFloat(shares) * parseFloat(pricePerShare),
+        senderPrivyId: senderPrivyId || senderEmail || "stripe-" + session.id,
+        recipientName: recipientName || "",
+        recipientContact: recipientEmail,
+        giftMessage: giftMessage || "",
+      });
+
+      // Update to pending_claim
+      await updateGift(gift.id, {
+        status: "pending_claim",
+        purchaseTxSig,
+        tokenAmount: tokensReceived,
+      });
+
+      // Send claim email
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
+      const claimUrl = `${appUrl}/gift/${gift.id}`;
+      console.log("[Webhook] Sending claim email to:", recipientEmail);
+      console.log("[Webhook] Claim URL:", claimUrl);
+      console.log("[Webhook] RESEND_FROM_EMAIL:", process.env.RESEND_FROM_EMAIL || "(not set - using test domain)");
+
+      // Use the request origin for internal API calls, or fall back to appUrl
+      const apiBase = appUrl;
+
+      try {
+        console.log("[Webhook] Calling email API at:", `${apiBase}/api/email/send`);
+        // For email, use display amount (human-readable shares)
+        const displayShares = tokensReceived / Math.pow(10, TOKEN_DECIMALS);
+        const emailRes = await fetch(`${apiBase}/api/email/send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: recipientEmail,
+            recipientName,
+            senderName: senderEmail?.split("@")[0] || "A friend",
+            marketTitle,
+            side,
+            shares: displayShares,
+            giftMessage,
+            claimUrl,
+          }),
+        });
+
+        if (!emailRes.ok) {
+          const errData = await emailRes.json().catch(() => ({}));
+          console.error("[Webhook] Email API error:", errData);
+        } else {
+          console.log("[Webhook] Claim email sent to:", recipientEmail);
+        }
+      } catch (emailErr) {
+        console.error("[Webhook] Email send failed:", emailErr);
+      }
+
+      console.log("[Webhook] Gift created successfully:", {
+        giftId: gift.id,
+        claimUrl,
+        demoMode: isDemoMode,
+      });
+    }
     
   } catch (error) {
     console.error("[Webhook] Failed to process gift:", error);

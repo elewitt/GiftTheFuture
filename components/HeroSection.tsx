@@ -86,7 +86,7 @@ export function HeroSection() {
           transition={{ duration: 0.6 }}
           className="mx-auto max-w-3xl text-5xl font-bold leading-tight tracking-tight md:text-7xl"
         >
-          Gift anyone a stake{" "}
+          Own a stake{" "}
           <span className="text-gradient-brand">in the future</span>
         </motion.h1>
 

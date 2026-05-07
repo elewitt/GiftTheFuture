@@ -153,6 +153,10 @@ export default function DashboardPage() {
     signature: null,
   });
 
+  // Get wallet address
+  const userWallet = wallets.find((w) => w.walletClientType === "privy") || wallets[0];
+  const walletAddress = userWallet?.address;
+
   useEffect(() => {
     if (!authenticated || !user) return;
 
@@ -162,8 +166,9 @@ export default function DashboardPage() {
 
       try {
         const email = user?.email?.address || "";
+        const walletParam = walletAddress ? `&walletAddress=${encodeURIComponent(walletAddress)}` : "";
         const res = await fetch(
-          `/api/user/dashboard?privyId=${user?.id}&email=${encodeURIComponent(email)}`
+          `/api/user/dashboard?privyId=${user?.id}&email=${encodeURIComponent(email)}${walletParam}`
         );
 
         if (!res.ok) throw new Error("Failed to fetch dashboard");
@@ -183,7 +188,7 @@ export default function DashboardPage() {
     }
 
     fetchDashboard();
-  }, [authenticated, user]);
+  }, [authenticated, user, walletAddress]);
 
   // Fetch USDC and SOL balances
   useEffect(() => {
@@ -711,7 +716,7 @@ export default function DashboardPage() {
           </div>
           <h1 className="text-2xl font-bold mb-3 text-foreground">Your Dashboard</h1>
           <p className="text-sm text-muted-foreground mb-8">
-            Sign in to see your prediction market positions, track your gifts, and cash out anytime.
+            Sign in to see your prediction market positions, track performance, and cash out anytime.
           </p>
           <Button onClick={login} size="lg" className="w-full">
             Sign In to Continue
@@ -892,7 +897,7 @@ export default function DashboardPage() {
         <div className="mt-12 text-center">
           <Link href="/">
             <Button variant="secondary">
-              🔍 Browse Markets & Send a Gift
+              🔍 Browse Markets
             </Button>
           </Link>
         </div>
@@ -1045,7 +1050,7 @@ function PositionsTab({ positions, onCashout }: { positions: Position[]; onCasho
         </div>
         <h3 className="text-lg font-semibold text-foreground mb-2">No positions yet</h3>
         <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
-          When someone sends you a prediction market gift and you claim it, your position will appear here.
+          Buy a position on any market to get started. Your positions will appear here.
         </p>
         <Link href="/">
           <Button>Browse Markets</Button>
@@ -1165,10 +1170,10 @@ function SentTab({ gifts }: { gifts: SentGift[] }) {
         </div>
         <h3 className="text-lg font-semibold text-foreground mb-2">No gifts sent yet</h3>
         <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
-          Send someone a prediction market position as a gift. They'll receive an email with a link to claim it.
+          Use the NBA Finals promo to send free positions to friends!
         </p>
         <Link href="/">
-          <Button>Send a Gift</Button>
+          <Button>View Promo</Button>
         </Link>
       </div>
     );

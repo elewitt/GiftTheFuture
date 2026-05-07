@@ -68,9 +68,24 @@ export function MarketCard({ market, index = 0, showRank = false }: MarketCardPr
                   {market.category}
                 </span>
               </div>
-              <span className="text-xs text-muted-foreground">
-                {formatVolume(market.volume24h || market.volume)} vol
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.location.href = `/chat/${encodeURIComponent(market.eventTicker || market.ticker)}`;
+                  }}
+                  className="p-1.5 rounded-lg bg-secondary/80 hover:bg-primary/20 hover:text-primary transition text-muted-foreground"
+                  title="Join chat"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </button>
+                <span className="text-xs text-muted-foreground">
+                  {formatVolume(market.volume24h || market.volume)} vol
+                </span>
+              </div>
             </div>
 
             <h3 className="mb-4 text-sm font-semibold leading-snug text-foreground line-clamp-2">

@@ -49,11 +49,170 @@ model User {
   email   String?
 
   // Bridge integration
-  bridgeCustomerId       String?
-  bridgeExternalAccountId String?
+  bridgeCustomerId         String?
+  bridgeExternalAccountId  String?
   bridgeLiquidationAddress String?
 
+  // Profile
+  username    String?  @unique
+  displayName String?
+  bio         String?  @db.Text
+  avatarUrl   String?
+
+  // Social links
+  twitterHandle   String?
+  instagramHandle String?
+  tiktokHandle    String?
+
+  // Onboarding
+  onboardingComplete Boolean @default(false)
+
+  // Relations
+  posts         Post[]
+  comments      Comment[]
+  likes         Like[]
+  following     Follow[]       @relation("Following")
+  followers     Follow[]       @relation("Followers")
+  channels      Channel[]      @relation("ChannelOwner")
+  subscriptions Subscription[]
+
   @@index([privyId])
+  @@index([username])
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  content   String   @db.Text
+  mediaUrls String[]
+
+  // Required bet attachment
+  marketTicker String
+  marketTitle  String
+  side         String
+  tokenAmount  Float
+  outcomeMint  String
+
+  // Optional channel (for paid content)
+  channelId String?
+  channel   Channel? @relation(fields: [channelId], references: [id])
+
+  // Engagement counts
+  likeCount    Int @default(0)
+  dislikeCount Int @default(0)
+  commentCount Int @default(0)
+
+  comments Comment[]
+  likes    Like[]
+
+  @@index([authorId, createdAt])
+  @@index([createdAt])
+  @@index([channelId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  content   String   @db.Text
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  parentId String?
+  parent   Comment?  @relation("Replies", fields: [parentId], references: [id])
+  replies  Comment[] @relation("Replies")
+
+  likeCount    Int    @default(0)
+  dislikeCount Int    @default(0)
+  likes        Like[]
+
+  @@index([postId, createdAt])
+  @@index([parentId])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  postId String?
+  post   Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  commentId String?
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  isLike Boolean @default(true)
+
+  @@unique([userId, postId])
+  @@unique([userId, commentId])
+  @@index([postId])
+  @@index([commentId])
+}
+
+model Follow {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  followerId String
+  follower   User   @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+
+  followingId String
+  following   User   @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model Channel {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  ownerId String
+  owner   User   @relation("ChannelOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String? @db.Text
+  avatarUrl   String?
+
+  // Subscription pricing (in USDC cents)
+  monthlyPrice Int
+
+  posts         Post[]
+  subscriptions Subscription[]
+
+  @@index([ownerId])
+}
+
+model Subscription {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  channelId String
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  // Payment tracking
+  paymentTxSig String?
+  amountPaid   Int
+
+  @@unique([userId, channelId])
+  @@index([expiresAt])
+  @@index([userId])
+  @@index([channelId])
 }
 
 model ChatMessage {

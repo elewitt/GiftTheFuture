@@ -1,13 +1,13 @@
 "use client";
 
 import { usePrivy, useLogin } from "@privy-io/react-auth";
+import { useSolanaWallets } from "@privy-io/react-auth/solana";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
-import { Input, Textarea } from "@/components/ui/input";
 
 interface MarketDetail {
   ticker: string;
@@ -220,6 +220,7 @@ export default function MarketPage() {
 
   const { ready, authenticated, user } = usePrivy();
   const { login } = useLogin();
+  const { wallets } = useSolanaWallets();
 
   const [market, setMarket] = useState<MarketDetail | null>(null);
   const [isMultiOutcome, setIsMultiOutcome] = useState(false);
@@ -228,12 +229,9 @@ export default function MarketPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Gift builder state
+  // Position builder state
   const [side, setSide] = useState<"yes" | "no">("yes");
-  const [giftAmount, setGiftAmount] = useState("10"); // Dollar amount as string for input
-  const [recipientName, setRecipientName] = useState("");
-  const [recipientContact, setRecipientContact] = useState("");
-  const [giftMessage, setGiftMessage] = useState("");
+  const [purchaseAmount, setPurchaseAmount] = useState("10"); // Dollar amount as string for input
 
   // Checkout state
   const [step, setStep] = useState<"build" | "processing">("build");
@@ -273,15 +271,19 @@ export default function MarketPage() {
   // For multi-outcome events, we're always buying YES on the selected outcome
   const selectedPrice = isMultiOutcome ? yesPrice : (side === "yes" ? yesPrice : noPrice);
 
-  // Calculate shares from gift amount
-  const giftAmountNum = parseFloat(giftAmount) || 0;
-  const shares = selectedPrice > 0 ? Math.floor(giftAmountNum / selectedPrice) : 0;
+  // Calculate shares from purchase amount
+  const purchaseAmountNum = parseFloat(purchaseAmount) || 0;
+  const shares = selectedPrice > 0 ? Math.floor(purchaseAmountNum / selectedPrice) : 0;
   const actualCost = (shares * selectedPrice).toFixed(2);
   const potentialPayout = shares.toFixed(2);
 
   // Minimum order amount for DFlow
   const MIN_ORDER_AMOUNT = 1.00;
-  const isBelowMinimum = giftAmountNum < MIN_ORDER_AMOUNT;
+  const isBelowMinimum = purchaseAmountNum < MIN_ORDER_AMOUNT;
+
+  // Get user's wallet address
+  const userWallet = wallets.find((w) => w.walletClientType === "privy") || wallets[0];
+  const userWalletAddress = userWallet?.address;
 
   async function handleCheckout() {
     if (!authenticated) {
@@ -289,18 +291,13 @@ export default function MarketPage() {
       return;
     }
 
-    if (!recipientContact) {
-      setCheckoutError("Please enter recipient's email");
-      return;
-    }
-
-    if (!recipientContact.includes("@")) {
-      setCheckoutError("Please enter a valid email address");
+    if (!userWalletAddress) {
+      setCheckoutError("Wallet not ready. Please wait a moment and try again.");
       return;
     }
 
     if (isBelowMinimum) {
-      setCheckoutError(`Minimum gift amount is $${MIN_ORDER_AMOUNT.toFixed(2)}.`);
+      setCheckoutError(`Minimum purchase is $${MIN_ORDER_AMOUNT.toFixed(2)}.`);
       return;
     }
 
@@ -308,7 +305,7 @@ export default function MarketPage() {
     setCheckoutError(null);
 
     try {
-      // Create Stripe checkout session
+      // Create Stripe checkout session for self-purchase
       // For multi-outcome, use the selected outcome's ticker and always buy YES
       const checkoutMarket = isMultiOutcome && selectedOutcome ? selectedOutcome : market;
       const checkoutSide = isMultiOutcome ? "yes" : side;
@@ -322,11 +319,10 @@ export default function MarketPage() {
           side: checkoutSide,
           shares,
           pricePerShare: selectedPrice,
-          recipientEmail: recipientContact,
-          recipientName,
-          giftMessage,
           senderEmail: user?.email?.address || "",
           senderPrivyId: user?.id || "",
+          isSelfPurchase: true,
+          userWalletAddress,
         }),
       });
 
@@ -599,31 +595,24 @@ export default function MarketPage() {
 
             {/* How it works */}
             <div className="bg-card border border-border rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-foreground mb-4">How gifting works</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <h3 className="text-sm font-semibold text-foreground mb-4">How it works</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex gap-3">
                   <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">1</span>
                   <div>
                     <p className="text-sm text-foreground font-medium">Pick your position</p>
-                    <p className="text-xs text-muted-foreground">Choose YES or NO and gift amount</p>
+                    <p className="text-xs text-muted-foreground">Choose YES or NO and amount</p>
                   </div>
                 </div>
                 <div className="flex gap-3">
                   <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">2</span>
                   <div>
-                    <p className="text-sm text-foreground font-medium">Add recipient</p>
-                    <p className="text-xs text-muted-foreground">Enter their email and a message</p>
+                    <p className="text-sm text-foreground font-medium">Buy your position</p>
+                    <p className="text-xs text-muted-foreground">Pay with card, tokens go to your wallet</p>
                   </div>
                 </div>
                 <div className="flex gap-3">
                   <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">3</span>
-                  <div>
-                    <p className="text-sm text-foreground font-medium">They claim it</p>
-                    <p className="text-xs text-muted-foreground">They get an email with a link to claim</p>
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">4</span>
                   <div>
                     <p className="text-sm text-foreground font-medium">Win or cash out</p>
                     <p className="text-xs text-muted-foreground">Hold until resolution or sell anytime</p>
@@ -633,7 +622,7 @@ export default function MarketPage() {
             </div>
           </motion.div>
 
-          {/* Right: Gift Builder */}
+          {/* Right: Position Builder */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -642,7 +631,7 @@ export default function MarketPage() {
           >
             <div className="bg-card border border-border rounded-2xl p-5 sticky top-24">
               <h2 className="text-lg font-bold text-foreground mb-5 flex items-center gap-2">
-                <span>🎁</span> Gift This Market
+                <span>📈</span> Buy Position
               </h2>
 
               {/* Outcome/Side picker */}
@@ -712,17 +701,17 @@ export default function MarketPage() {
                 )}
               </div>
 
-              {/* Gift Amount Input */}
+              {/* Amount Input */}
               <div className="mb-5">
                 <label className="block text-xs text-muted-foreground uppercase tracking-wide mb-2">
-                  Gift Amount
+                  Amount
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-muted-foreground">$</span>
                   <input
                     type="text"
                     inputMode="decimal"
-                    value={giftAmount}
+                    value={purchaseAmount}
                     onChange={(e) => {
                       // Only allow numbers and decimal point
                       const val = e.target.value.replace(/[^0-9.]/g, '');
@@ -731,7 +720,7 @@ export default function MarketPage() {
                       if (parts.length > 2) return;
                       // Limit to 2 decimal places
                       if (parts[1] && parts[1].length > 2) return;
-                      setGiftAmount(val);
+                      setPurchaseAmount(val);
                     }}
                     placeholder="10.00"
                     className="w-full pl-10 pr-4 py-4 text-2xl font-bold text-center bg-secondary border-2 border-transparent rounded-xl focus:outline-none focus:border-primary transition"
@@ -741,9 +730,9 @@ export default function MarketPage() {
                   {[5, 10, 25, 50, 100].map((n) => (
                     <button
                       key={n}
-                      onClick={() => setGiftAmount(n.toString())}
+                      onClick={() => setPurchaseAmount(n.toString())}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                        parseFloat(giftAmount) === n
+                        parseFloat(purchaseAmount) === n
                           ? "bg-primary/20 text-primary border border-primary/30"
                           : "bg-secondary text-muted-foreground hover:text-foreground"
                       }`}
@@ -752,43 +741,6 @@ export default function MarketPage() {
                     </button>
                   ))}
                 </div>
-              </div>
-
-              {/* Recipient info */}
-              <div className="mb-4">
-                <label className="block text-xs text-muted-foreground uppercase tracking-wide mb-2">
-                  Recipient&apos;s Name
-                </label>
-                <Input
-                  type="text"
-                  placeholder="e.g. Jake"
-                  value={recipientName}
-                  onChange={(e) => setRecipientName(e.target.value)}
-                />
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-xs text-muted-foreground uppercase tracking-wide mb-2">
-                  Recipient&apos;s Email *
-                </label>
-                <Input
-                  type="email"
-                  placeholder="jake@email.com"
-                  value={recipientContact}
-                  onChange={(e) => setRecipientContact(e.target.value)}
-                />
-              </div>
-
-              <div className="mb-5">
-                <label className="block text-xs text-muted-foreground uppercase tracking-wide mb-2">
-                  Gift Message
-                </label>
-                <Textarea
-                  placeholder="Good luck!"
-                  value={giftMessage}
-                  onChange={(e) => setGiftMessage(e.target.value)}
-                  rows={2}
-                />
               </div>
 
               {/* Payout Summary */}
@@ -824,7 +776,7 @@ export default function MarketPage() {
 
                 {isBelowMinimum && (
                   <p className="text-xs text-amber-500 mt-3 text-center">
-                    Minimum gift is ${MIN_ORDER_AMOUNT.toFixed(2)}
+                    Minimum purchase is ${MIN_ORDER_AMOUNT.toFixed(2)}
                   </p>
                 )}
               </div>
@@ -848,20 +800,20 @@ export default function MarketPage() {
                     Creating checkout...
                   </span>
                 ) : !authenticated ? (
-                  "Sign In to Gift"
+                  "Sign In to Buy"
                 ) : isMultiOutcome && !selectedOutcome ? (
                   "Select an Outcome"
                 ) : isBelowMinimum ? (
                   `Minimum $${MIN_ORDER_AMOUNT.toFixed(2)}`
                 ) : shares === 0 ? (
-                  "Enter Gift Amount"
+                  "Enter Amount"
                 ) : (
-                  `🎁 Send $${actualCost} Gift`
+                  `Buy $${actualCost} Position`
                 )}
               </Button>
 
               <p className="text-[10px] text-muted-foreground text-center mt-3">
-                Pay with card · Recipient claims via email · No wallet needed
+                Pay with card · Tokens sent directly to your wallet
               </p>
             </div>
           </motion.div>
