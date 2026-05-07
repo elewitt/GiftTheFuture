@@ -143,7 +143,7 @@ export function Feed({
           >
             <PostCard
               {...post}
-              isOwnPost={user?.id && post.author.id === user.id}
+              isOwnPost={!!(user?.id && post.author.id === user.id)}
               onDelete={() => handlePostDeleted(post.id)}
             />
           </motion.div>

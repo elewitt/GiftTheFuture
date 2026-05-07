@@ -77,8 +77,8 @@ export async function GET(req: Request) {
         ticker: market.ticker,
         title: market.title,
         status: market.status,
-        yesBid: market.yesBid,
-        yesAsk: market.yesAsk,
+        yes_price: market.yes_price,
+        no_price: market.no_price,
       };
     } catch (e: any) {
       results.market = { error: e.message };
