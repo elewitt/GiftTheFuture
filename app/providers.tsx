@@ -72,7 +72,17 @@ function OnboardingCheck({ children }: { children: React.ReactNode }) {
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // During SSR/build, render children without Privy
+  if (!mounted) {
+    return <>{children}</>;
+  }
 
   if (!appId) {
     return (
