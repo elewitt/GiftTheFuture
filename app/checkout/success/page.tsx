@@ -63,6 +63,23 @@ function SuccessContent() {
   }
 
   if (result?.error) {
+    // Translate technical errors to user-friendly messages
+    let friendlyError = result.error;
+    let showRefund = false;
+
+    if (result.error.includes("insufficient funds")) {
+      friendlyError = "Our system is temporarily unable to process purchases. Your payment has been refunded. Please try again later.";
+      showRefund = true;
+    } else if (result.error.includes("Zero out amount") || result.error.includes("zero_out_amount")) {
+      friendlyError = "The purchase amount is too small for this market. Please try a larger amount (at least $5).";
+    } else if (result.error.includes("Simulation failed")) {
+      friendlyError = "Unable to complete the transaction. Your payment will be refunded within 5-10 business days.";
+      showRefund = true;
+    } else if (result.error.includes("Market not found")) {
+      friendlyError = "This market is no longer available. Your payment has been refunded.";
+      showRefund = true;
+    }
+
     return (
       <div className="min-h-screen flex items-center justify-center px-5 bg-background">
         <div className="max-w-md w-full text-center">
@@ -72,7 +89,12 @@ function SuccessContent() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-foreground mb-2">Something went wrong</h1>
-          <p className="text-muted-foreground mb-6">{result.error}</p>
+          <p className="text-muted-foreground mb-4">{friendlyError}</p>
+          {showRefund && (
+            <p className="text-sm text-muted-foreground mb-6">
+              If you don&apos;t see your refund within 10 business days, please contact support.
+            </p>
+          )}
           <Link
             href="/feed"
             className="inline-block py-3 px-6 rounded-xl bg-primary text-primary-foreground font-medium hover:opacity-90 transition"
